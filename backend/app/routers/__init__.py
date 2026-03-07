@@ -1,6 +1,5 @@
-from .users import router as users_router
-try:
-	from .complaints import router as complaints_router
-except Exception:
-	# complaints router may not exist yet during initial setup
-	complaints_router = None
+from .auth import router as auth_router
+from .admin import router as admin_router
+from .complaints import router as complaints_router
+from .rooms import router as rooms_router
+from .notices import router as notices_router

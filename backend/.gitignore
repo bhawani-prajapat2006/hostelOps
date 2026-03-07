@@ -1,0 +1,14 @@
+.env
+hims.db
+*.db
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+htmlcov/
+.coverage
+*.egg-info/
+dist/
+build/
+.vscode/
+*.log
