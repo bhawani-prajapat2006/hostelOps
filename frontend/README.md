@@ -1,36 +1,248 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# HostelOps Frontend 🏨
 
-## Getting Started
+**HostelOps** is a streamlined, role-based management portal designed for the **IIT Jodhpur** campus ecosystem. It automates and organizes the lifecycle of hostel-related complaints, providing tailored interfaces for students, wardens, maintenance workers, and administrators.
 
-First, run the development server:
+Repository:
+https://github.com/bhawani-prajapat2006/hostelOps.git
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+# 🚀 Tech Stack
+
+| Layer      | Technology              |
+| ---------- | ----------------------- |
+| Framework  | Next.js 16 (App Router) |
+| Library    | React 19                |
+| Styling    | Tailwind CSS 4          |
+| UI Library | Shadcn UI (Radix UI)    |
+| Animation  | Framer Motion           |
+| Icons      | Lucide React            |
+| API Client | Axios                   |
+
+---
+
+# 🛠 Installation & Setup
+
+## 1️⃣ Clone the Repository
+
+### Linux / macOS
+
+```
+git clone https://github.com/bhawani-prajapat2006/hostelOps.git
+cd hostelOps/frontend
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Windows (PowerShell / CMD)
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```
+git clone https://github.com/bhawani-prajapat2006/hostelOps.git
+cd hostelOps\frontend
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 2️⃣ Install Dependencies
 
-To learn more about Next.js, take a look at the following resources:
+### Linux / macOS
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+npm install
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Windows
 
-## Deploy on Vercel
+```
+npm install
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+*(same command for Windows)*
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 3️⃣ Run Development Server
+
+### Linux / macOS
+
+```
+npm run dev
+```
+
+### Windows
+
+```
+npm run dev
+```
+
+Open in browser:
+
+```
+http://localhost:3000
+```
+
+---
+
+# 📁 Project Structure
+
+```
+frontend/
+│
+├── src/
+│   ├── app/                # Next.js App Router
+│   │   ├── dashboard/      # Main dashboard
+│   │   ├── complaints/     # Complaint system
+│   │   ├── admin/          # Admin controls
+│   │   ├── login/          # Authentication
+│   │   ├── layout.js       # Global providers
+│   │   └── globals.css     # Tailwind styles
+│   │
+│   ├── components/
+│   │   ├── ui/             # Shadcn UI components
+│   │   ├── theme-provider.js
+│   │   └── theme-toggle.js
+│   │
+│   ├── lib/                # Utilities (Axios config)
+│   └── hooks/              # Custom hooks
+│
+├── public/                 # Static assets
+├── jsconfig.json           # Path aliases
+├── components.json         # Shadcn config
+└── package.json
+```
+
+---
+
+# 🧩 Using Shadcn Components
+
+Add components:
+
+```
+npx shadcn@latest add button
+npx shadcn@latest add card
+npx shadcn@latest add input
+```
+
+Components will appear in:
+
+```
+src/components/ui/
+```
+
+You can modify Tailwind styles directly.
+
+---
+
+# ⚠️ Troubleshooting
+
+## 1️⃣ Module Not Found
+
+Example error:
+
+```
+Module not found: Can't resolve '@/components/ui/button'
+```
+
+Fix:
+
+```
+rm -rf .next
+npm run dev
+```
+
+Windows:
+
+```
+rmdir /s /q .next
+npm run dev
+```
+
+Also check `jsconfig.json`:
+
+```
+{
+  "compilerOptions": {
+    "baseUrl": "src",
+    "paths": {
+      "@/*": ["*"]
+    }
+  }
+}
+```
+
+---
+
+## 2️⃣ Hydration Error (Next.js)
+
+Example error:
+
+```
+Hydration failed because the server rendered HTML didn't match the client
+```
+
+Fix by using mounted state:
+
+```
+const [mounted, setMounted] = useState(false)
+
+useEffect(() => {
+  setMounted(true)
+}, [])
+
+if (!mounted) return null
+```
+
+Used in theme toggle and dashboard.
+
+---
+
+## 3️⃣ NPM / Node Not Recognized (Windows)
+
+If you see:
+
+```
+'npm' is not recognized as an internal command
+```
+
+Install Node.js from:
+
+```
+https://nodejs.org
+```
+
+Then restart the terminal.
+
+---
+
+## 4️⃣ Turbopack Cache Error
+
+If Next.js crashes:
+
+Linux/macOS
+
+```
+rm -rf .next node_modules
+npm install
+npm run dev
+```
+
+Windows
+
+```
+rmdir /s /q .next
+rmdir /s /q node_modules
+npm install
+npm run dev
+```
+
+---
+
+# 👨‍💻 Maintainer
+
+Mayuri Pujari
+B.Tech Engineering Science
+IIT Jodhpur
+
+---
+
+# 🏛 Project
+
+IIT Jodhpur Hostel Issue Management System
