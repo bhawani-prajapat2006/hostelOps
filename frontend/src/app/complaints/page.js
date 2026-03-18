@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import api from "@/lib/api"
-import { motion, AnimatePresence } from "framer-motion"
 import { 
   Plus, 
   Search, 
@@ -19,12 +18,6 @@ import {
   ChevronRight
 } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
-
 const getCategoryIcon = (category) => {
   switch (category) {
     case "plumbing": return <Wrench className="w-4 h-4" />
@@ -35,19 +28,11 @@ const getCategoryIcon = (category) => {
   }
 }
 
-const getStatusStyles = (status) => {
-  switch (status) {
-    case "open": return "bg-amber-500/10 text-amber-500 border-amber-500/20"
-    case "in_progress": return "bg-blue-500/10 text-blue-500 border-blue-500/20"
-    case "closed": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-    default: return "bg-zinc-500/10 text-zinc-500"
-  }
-}
-
 export default function Complaints() {
   const [complaints, setComplaints] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [notification, setNotification] = useState({ show: false, message: "", type: "" })
 
   useEffect(() => {
     fetchComplaints()
@@ -56,10 +41,9 @@ export default function Complaints() {
   const fetchComplaints = async () => {
     try {
       const res = await api.get("/complaints")
-      // Accessing .complaints because of your PaginatedComplaints schema
       setComplaints(res.data.complaints || []) 
     } catch (err) {
-      toast.error("Failed to load complaints")
+      showNotification("Failed to load complaints", "error")
     } finally {
       setLoading(false)
     }
@@ -68,110 +52,117 @@ export default function Complaints() {
   const handleDelete = async (id) => {
     try {
       await api.delete(`/complaints/${id}`)
-      toast.success("Complaint deleted successfully")
+      showNotification("Complaint deleted successfully", "success")
       setComplaints(complaints.filter(c => c.id !== id))
     } catch (err) {
-      toast.error("Deletion failed: Permission denied")
+      showNotification("Deletion failed: Permission denied", "error")
     }
   }
 
+  const showNotification = (message, type) => {
+    setNotification({ show: true, message, type })
+    setTimeout(() => setNotification({ show: false, message: "", type: "" }), 3000)
+  }
+
   return (
-    <div className="min-h-screen bg-background p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-base-100 p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
+      
+      {/* Notification */}
+      {notification.show && (
+        <div className={`alert alert-${notification.type === 'error' ? 'error' : 'success'}`}>
+          <span>{notification.message}</span>
+        </div>
+      )}
       
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter font-serif italic">Complaints</h1>
-          <p className="text-muted-foreground mt-1 font-medium">Resolution Center • IIT Jodhpur</p>
+          <h1 className="text-4xl font-bold">Complaints</h1>
+          <p className="text-base-content/60 mt-1 font-medium">Resolution Center • IIT Jodhpur</p>
         </div>
-        <Button className="gap-2 h-12 px-6 shadow-xl shadow-primary/20 rounded-xl font-bold">
+        <button className="btn btn-primary btn-lg gap-2">
           <Plus className="w-5 h-5" /> New Complaint
-        </Button>
+        </button>
       </div>
 
       {/* Search & Filter */}
       <div className="flex gap-4 items-center">
-        <div className="relative flex-1 max-w-md group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <Input 
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
+          <input 
+            type="text"
             placeholder="Search by title or ID..." 
-            className="pl-10 h-11 bg-card/50 border-border/50 rounded-xl focus:ring-primary/20"
+            className="input input-bordered w-full pl-10 bg-base-200"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="h-11 rounded-xl border-border/50 glass font-semibold gap-2">
+        <button className="btn btn-outline gap-2 border-base-300">
           <Filter className="w-4 h-4" /> Filters
-        </Button>
+        </button>
       </div>
 
       {/* Main Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-56 rounded-[2rem] bg-muted/40 animate-pulse border border-border/50" />
+            <div key={i} className="h-56 rounded-lg bg-base-200 animate-pulse" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AnimatePresence>
-            {complaints.length > 0 ? complaints.map((c, index) => (
-              <motion.div
-                key={c.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.2, delay: index * 0.05 }}
-              >
-                <Card className="glass border-border/50 rounded-[2rem] group hover:border-primary/40 transition-all duration-500 overflow-hidden">
-                  <CardHeader className="flex flex-row items-start justify-between pb-2">
-                    <Badge variant="outline" className={`capitalize font-black tracking-wider text-[10px] py-1 px-3 rounded-full ${getStatusStyles(c.status)}`}>
-                      {c.status === 'in_progress' ? (
-                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      ) : (
-                        <div className={`w-1.5 h-1.5 rounded-full mr-2 bg-current`} />
-                      )}
-                      {c.status.replace('_', ' ')}
-                    </Badge>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-full text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-all"
-                      onClick={() => handleDelete(c.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-4 pt-2">
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-bold tracking-tight line-clamp-1 group-hover:text-primary transition-colors">
-                        {c.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed font-medium">
-                        {c.description}
-                      </p>
-                    </div>
+          {complaints.length > 0 ? complaints.map((c) => (
+            <div key={c.id} className="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+              <div className="card-body">
+                <div className="flex items-start justify-between">
+                  <div className={`badge ${getStatusBadge(c.status)}`}>
+                    {c.status === 'in_progress' ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : null}
+                    {c.status.replace('_', ' ')}
+                  </div>
+                  <button 
+                    className="btn btn-ghost btn-sm btn-circle"
+                    onClick={() => handleDelete(c.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                <h3 className="card-title text-lg line-clamp-1 mt-4">
+                  {c.title}
+                </h3>
+                <p className="text-sm text-base-content/70 line-clamp-2">
+                  {c.description}
+                </p>
 
-                    <div className="flex items-center justify-between pt-5 border-t border-border/30">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                        <div className="p-1.5 bg-muted rounded-lg">{getCategoryIcon(c.category)}</div>
-                        {c.category}
-                      </div>
-                      <span className="text-[10px] font-mono text-muted-foreground/50">ID: #{c.id}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )) : (
-              <div className="col-span-full py-20 text-center glass border-dashed border-2 border-border/50 rounded-[3rem]">
-                <p className="text-muted-foreground font-bold italic">No complaints found. All systems operational.</p>
+                <div className="divider my-2"></div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs">
+                    <div>{getCategoryIcon(c.category)}</div>
+                    <span className="uppercase font-bold">{c.category}</span>
+                  </div>
+                  <span className="text-xs text-base-content/50 font-mono">ID: #{c.id}</span>
+                </div>
               </div>
-            )}
-          </AnimatePresence>
+            </div>
+          )) : (
+            <div className="col-span-full py-20 text-center">
+              <p className="text-base-content/60 font-bold">No complaints found. All systems operational.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
   )
+}
+
+function getStatusBadge(status) {
+  switch (status) {
+    case "open": return "badge-warning"
+    case "in_progress": return "badge-info"
+    case "closed": return "badge-success"
+    default: return "badge-ghost"
+  }
 }
