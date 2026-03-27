@@ -22,6 +22,7 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [toasts, setToasts] = useState([])
 
   useEffect(() => {
     fetchUser()
@@ -56,17 +57,28 @@ export default function Navbar() {
     return null
   }
 
+  const addToast = (message, type) => {
+    const id = Date.now()
+    const newToast = { id, message, type }
+    setToasts(prev => [...prev, newToast])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 3000)
+  }
+
   const handleLogout = async () => {
     try {
       // Call logout endpoint to blacklist token
       await api.post("/api/v1/auth/logout")
+      addToast("Logged out successfully!", "success")
     } catch (err) {
       console.error("Logout failed:", err)
+      addToast("Logout failed!", "error")
     } finally {
       // Clear tokens regardless of API response
       localStorage.removeItem("access_token")
       localStorage.removeItem("refresh_token")
-      router.push("/login")
+      setTimeout(() => router.push("/login"), 1500)
     }
   }
 
@@ -109,7 +121,17 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="navbar bg-base-200 shadow-lg sticky top-0 z-40">
+    <>
+      {/* Toast Container */}
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`alert alert-${toast.type === 'error' ? 'error' : 'success'} shadow-lg`}>
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
+
+      <nav className="navbar bg-base-200 shadow-lg sticky top-0 z-40">
       {/* Brand */}
       <div className="flex-1">
         <Link href="/dashboard" className="px-4 text-xl font-bold hover:opacity-80 transition">
@@ -242,5 +264,6 @@ export default function Navbar() {
         </div>
       )}
     </nav>
+    </>
   )
 }
