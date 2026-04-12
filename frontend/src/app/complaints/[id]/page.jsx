@@ -85,6 +85,12 @@ export default function ComplaintDetailPage() {
         api.get(`/api/v1/complaints/${complaintId}/history`)
       ])
 
+      // Check if user is active
+      if (userRes.data.status !== "active") {
+        router.replace("/auth/pending-approval")
+        return
+      }
+
       setUser(userRes.data)
       setComplaint(complaintRes.data)
       setNewStatus(complaintRes.data.status)

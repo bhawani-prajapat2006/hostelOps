@@ -15,11 +15,18 @@ class UserRole(str, Enum):
     admin = "admin"
 
 
+class UserStatus(str, Enum):
+    pending = "pending"
+    active = "active"
+    inactive = "inactive"
+
+
 class UserPublic(BaseModel):
     id: int
     username: str
     email: EmailStr
     role: UserRole
+    status: UserStatus
     phone: Optional[str] = None
     hostel_name: Optional[str] = None
     room_number: Optional[str] = None

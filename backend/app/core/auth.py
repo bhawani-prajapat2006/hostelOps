@@ -44,11 +44,13 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="User not found")
 
-    # Always return role as a plain string
+    # Always return role and status as plain strings
     role_value = getattr(user.role, "value", user.role)
+    status_value = getattr(user.status, "value", user.status)
     return {
         "id": user.id,
         "role": role_value,
+        "status": status_value,
         "email": user.email,
         "username": user.username,
         "phone": user.phone,
@@ -74,3 +76,25 @@ def require_role(*allowed_roles: str):
             )
         return current_user
     return role_checker
+
+
+def require_active_status(current_user: dict = Depends(get_current_user)):
+    """Dependency: ensures user is active (not pending or inactive)."""
+    if current_user.get("status") != "active":
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail=f"Your account is not active. Current status: {current_user.get('status', 'unknown')}. Please wait for admin approval.",
+        )
+    return current_user
+
+
+def require_role_and_active(*allowed_roles: str):
+    """Dependency factory: restricts access to active users with one of the allowed roles."""
+    def checker(current_user: dict = Depends(require_role(*allowed_roles))):
+        if current_user.get("status") != "active":
+            raise HTTPException(
+                status_code=HTTPStatus.FORBIDDEN,
+                detail=f"Your account is not active. Current status: {current_user.get('status', 'unknown')}. Please wait for admin approval.",
+            )
+        return current_user
+    return checker

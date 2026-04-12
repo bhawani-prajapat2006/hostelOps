@@ -9,7 +9,7 @@ from app.schemas.complaint import (
     ComplaintHistoryPublic, PaginatedComplaints, ComplaintStatus, ComplaintCategory,
 )
 from app.schemas.user import Message
-from app.core.auth import get_current_user, require_role
+from app.core.auth import get_current_user, require_role, require_role_and_active, require_active_status
 from app.db.database import get_db
 from app import models
 
@@ -21,10 +21,10 @@ router = APIRouter()
 @router.post("/", response_model=ComplaintPublic, status_code=HTTPStatus.CREATED)
 def create_complaint(
     complaint: ComplaintCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_active_status),
     db: Session = Depends(get_db),
 ):
-    """Students and wardens can create complaints."""
+    """Students and wardens can create complaints (must be active)."""
     if current_user["role"] not in (models.UserRoleEnum.student.value, models.UserRoleEnum.warden.value):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Only students and wardens can create complaints")
 
@@ -54,7 +54,7 @@ def create_complaint(
 # ───── My complaints ─────
 
 @router.get("/my", response_model=List[ComplaintPublic])
-def my_complaints(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def my_complaints(current_user: dict = Depends(require_active_status), db: Session = Depends(get_db)):
     """Return complaints created by the current user."""
     complaints = db.query(models.Complaint).filter(
         models.Complaint.created_by == current_user["id"]
@@ -66,7 +66,7 @@ def my_complaints(current_user: dict = Depends(get_current_user), db: Session = 
 
 @router.get("/assigned", response_model=List[ComplaintPublic])
 def assigned_complaints(
-    current_user: dict = Depends(require_role("worker")),
+    current_user: dict = Depends(require_role_and_active("worker")),
     db: Session = Depends(get_db),
 ):
     """Workers: see complaints assigned to them."""
@@ -80,7 +80,7 @@ def assigned_complaints(
 
 @router.get("/", response_model=PaginatedComplaints)
 def list_complaints(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_active_status),
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -129,7 +129,7 @@ def list_complaints(
 # ───── Get single ─────
 
 @router.get("/{complaint_id}", response_model=ComplaintPublic)
-def get_complaint(complaint_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_complaint(complaint_id: int, current_user: dict = Depends(require_active_status), db: Session = Depends(get_db)):
     complaint = db.get(models.Complaint, complaint_id)
     if not complaint:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
@@ -139,7 +139,7 @@ def get_complaint(complaint_id: int, current_user: dict = Depends(get_current_us
 # ───── Get complaint history ─────
 
 @router.get("/{complaint_id}/history", response_model=List[ComplaintHistoryPublic])
-def get_complaint_history(complaint_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_complaint_history(complaint_id: int, current_user: dict = Depends(require_active_status), db: Session = Depends(get_db)):
     complaint = db.get(models.Complaint, complaint_id)
     if not complaint:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
@@ -149,7 +149,7 @@ def get_complaint_history(complaint_id: int, current_user: dict = Depends(get_cu
 # ───── Update (with ownership check) ─────
 
 @router.put("/{complaint_id}", response_model=ComplaintPublic)
-def update_complaint(complaint_id: int, complaint: ComplaintUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_complaint(complaint_id: int, complaint: ComplaintUpdate, current_user: dict = Depends(require_active_status), db: Session = Depends(get_db)):
     existing = db.get(models.Complaint, complaint_id)
     if not existing:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
@@ -198,7 +198,7 @@ def update_complaint(complaint_id: int, complaint: ComplaintUpdate, current_user
 def assign_complaint(
     complaint_id: int,
     payload: ComplaintAssign,
-    current_user: dict = Depends(require_role("warden", "admin")),
+    current_user: dict = Depends(require_role_and_active("warden", "admin")),
     db: Session = Depends(get_db),
 ):
     """Warden/Admin assigns a worker to a complaint."""
@@ -236,7 +236,7 @@ def assign_complaint(
 @router.delete("/{complaint_id}", response_model=Message)
 def delete_complaint(
     complaint_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_active_status),
     db: Session = Depends(get_db),
 ):
     complaint = db.get(models.Complaint, complaint_id)

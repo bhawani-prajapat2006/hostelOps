@@ -84,30 +84,12 @@ export default function Navbar() {
 
   const getNavLinks = () => {
     if (!user) return []
-    
-    const baseLinks = [
+
+    // Same links for all roles - dashboard auto-redirects based on role
+    return [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Complaints", href: "/complaints", icon: FileText },
     ]
-
-    // Role-specific links
-    if (user.role === "student") {
-      return baseLinks
-    } else if (user.role === "worker") {
-      return baseLinks
-    } else if (user.role === "warden") {
-      return [
-        ...baseLinks,
-        { label: "Warden Panel", href: "/dashboard/warden", icon: Settings },
-      ]
-    } else if (user.role === "admin") {
-      return [
-        ...baseLinks,
-        { label: "Admin Panel", href: "/admin", icon: Settings },
-      ]
-    }
-
-    return baseLinks
   }
 
   if (loading) {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import api from "@/lib/api"
 import CloudinaryUpload from "@/components/CloudinaryUpload"
@@ -43,6 +44,7 @@ const CATEGORIES = [
 ]
 
 export default function Complaints() {
+  const router = useRouter()
   const [user, setUser] = useState(null)
   const [complaints, setComplaints] = useState([])
   const [loading, setLoading] = useState(true)
@@ -69,6 +71,13 @@ export default function Complaints() {
       // First get current user
       const userRes = await api.get("/api/v1/auth/me")
       const userData = userRes.data
+
+      // Check if user is active
+      if (userData.status !== "active") {
+        router.replace("/auth/pending-approval")
+        return
+      }
+
       setUser(userData)
 
       // Then fetch complaints based on role

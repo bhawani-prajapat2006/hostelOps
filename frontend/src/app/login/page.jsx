@@ -15,8 +15,24 @@ const routeByRole = async (token, router) => {
     })
 
     const role = meRes.data?.role
+    const status = meRes.data?.status
+
+    // If pending approval, show waiting page
+    if (status === "pending") {
+      router.push("/auth/pending-approval")
+      return
+    }
+
     if (role === "warden") {
       router.push("/dashboard/warden")
+      return
+    }
+    if (role === "admin") {
+      router.push("/dashboard/admin")
+      return
+    }
+    if (role === "worker") {
+      router.push("/dashboard/worker")
       return
     }
 
@@ -41,6 +57,7 @@ export default function AuthPage() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [role, setRole] = useState("student")  // Role selection for registration
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -63,6 +80,7 @@ export default function AuthPage() {
           username,
           email,
           password,
+          role,  // Include role in registration
         })
       }
 
@@ -100,7 +118,8 @@ export default function AuthPage() {
       }
       setSuccess("Login successful!")
       setTimeout(() => {
-        routeByRole(access_token, router)
+        // Redirect to role selection for Google users
+        router.push("/auth/select-role")
       }, 1000)
     } catch (err) {
       setError(err.response?.data?.detail || "Google login failed")
@@ -178,6 +197,65 @@ export default function AuthPage() {
                 />
               </div>
             </div>
+
+            {/* Role Selection (Register Only) */}
+            {mode === "register" && (
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text font-semibold">Select Your Role</span>
+                </label>
+                <div className="space-y-2">
+                  <div className="form-control">
+                    <label className="label cursor-pointer justify-start gap-3">
+                      <input
+                        type="radio"
+                        name="role"
+                        value="student"
+                        checked={role === "student"}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="radio radio-sm"
+                      />
+                      <span className="label-text">
+                        <span className="font-medium">Student</span>
+                        <span className="text-xs text-base-content/60 ml-2">(Can post complaints)</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div className="form-control">
+                    <label className="label cursor-pointer justify-start gap-3">
+                      <input
+                        type="radio"
+                        name="role"
+                        value="worker"
+                        checked={role === "worker"}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="radio radio-sm"
+                      />
+                      <span className="label-text">
+                        <span className="font-medium">Worker</span>
+                        <span className="text-xs text-base-content/60 ml-2">(Needs admin approval)</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div className="form-control">
+                    <label className="label cursor-pointer justify-start gap-3">
+                      <input
+                        type="radio"
+                        name="role"
+                        value="warden"
+                        checked={role === "warden"}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="radio radio-sm"
+                      />
+                      <span className="label-text">
+                        <span className="font-medium">Warden</span>
+                        <span className="text-xs text-base-content/60 ml-2">(Needs admin approval)</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Error Alert */}
             {error && (

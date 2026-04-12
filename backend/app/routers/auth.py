@@ -55,18 +55,24 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=HTTPStatus.CONFLICT, detail="Email already registered")
 
+    # Determine initial status based on role
+    # Students are immediately active, workers/wardens need approval
+    role = models.UserRoleEnum(payload.role)
+    status = models.UserStatusEnum.active if role == models.UserRoleEnum.student else models.UserStatusEnum.pending
+
     user = models.User(
         username=payload.username,
         email=payload.email,
         password=hash_password(payload.password),
-        role=models.UserRoleEnum.student,
+        role=role,
+        status=status,
         auth_provider="local",
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    token_data = {"sub": str(user.id), "role": user.role.value}
+    token_data = {"sub": str(user.id), "role": user.role.value, "status": user.status.value}
     return {
         "access_token": create_access_token(token_data),
         "refresh_token": create_refresh_token(token_data),
@@ -85,7 +91,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not verify_password(payload.password, user.password):
         raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Invalid email or password")
 
-    token_data = {"sub": str(user.id), "role": user.role.value}
+    token_data = {"sub": str(user.id), "role": user.role.value, "status": user.status.value}
     return {
         "access_token": create_access_token(token_data),
         "refresh_token": create_refresh_token(token_data),
@@ -182,15 +188,100 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
             email=email,
             password=None,
             role=models.UserRoleEnum.student,
+            status=models.UserStatusEnum.active,  # Google users are active by default
             auth_provider="google",
         )
         db.add(user)
         db.commit()
         db.refresh(user)
 
-    token_data = {"sub": str(user.id), "role": user.role.value}
+    token_data = {"sub": str(user.id), "role": user.role.value, "status": user.status.value}
     return {
         "access_token": create_access_token(token_data),
         "refresh_token": create_refresh_token(token_data),
         "token_type": "bearer",
     }
+
+
+# ───── Role Selection (for Google OAuth users) ─────
+
+from app.schemas.auth import RoleUpdateRequest
+
+@router.post("/select-role", response_model=UserPublic)
+def select_role(
+    payload: RoleUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Allow user to select role (for Google OAuth flow)."""
+    user = db.get(models.User, current_user["id"])
+    if not user:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="User not found")
+
+    role = models.UserRoleEnum(str(payload.role))
+    user.role = role
+    user.status = models.UserStatusEnum.active if role == models.UserRoleEnum.student else models.UserStatusEnum.pending
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+# ───── Admin: Approve/Reject Users ─────
+
+@router.get("/pending-users", response_model=list[UserPublic], tags=["Admin"])
+def get_pending_users(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin: Get all pending user approval requests."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Only admins can view pending users")
+
+    pending = db.query(models.User).filter(models.User.status == models.UserStatusEnum.pending).all()
+    return pending
+
+
+@router.post("/approve-user/{user_id}", response_model=UserPublic, tags=["Admin"])
+def approve_user(
+    user_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin: Approve a pending user (worker/warden)."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Only admins can approve users")
+
+    user = db.get(models.User, user_id)
+    if not user:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="User not found")
+
+    if user.status != models.UserStatusEnum.pending:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="User is not pending approval")
+
+    user.status = models.UserStatusEnum.active
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/reject-user/{user_id}", response_model=UserPublic, tags=["Admin"])
+def reject_user(
+    user_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin: Reject a pending user application."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Only admins can reject users")
+
+    user = db.get(models.User, user_id)
+    if not user:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="User not found")
+
+    if user.status != models.UserStatusEnum.pending:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="User is not pending approval")
+
+    user.status = models.UserStatusEnum.inactive
+    db.commit()
+    db.refresh(user)
+    return user

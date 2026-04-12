@@ -10,7 +10,7 @@ from app.schemas.user import Message, PaginatedUsers
 from app.routers import complaints_router, auth_router
 from app.db.database import engine, get_db, Base, _get_session_local
 from app import models
-from app.core.auth import get_current_user, require_role
+from app.core.auth import get_current_user, require_role, require_role_and_active, require_active_status
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +84,12 @@ def read_root():
 @app.get("/api/v1/users/", response_model=PaginatedUsers, tags=["Users"])
 @app.get("/users/", response_model=PaginatedUsers, tags=["Users"], include_in_schema=False)
 def list_users(
-    current_user: dict = Depends(require_role("admin", "warden")),
+    current_user: dict = Depends(require_role_and_active("admin", "warden")),
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    """Admin/Warden: list all users with pagination."""
+    """Admin/Warden: list all users with pagination (must be active)."""
     query = db.query(models.User)
     total = query.count()
     users = query.offset((page - 1) * page_size).limit(page_size).all()

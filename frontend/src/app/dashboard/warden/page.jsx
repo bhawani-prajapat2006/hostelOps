@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import axios from "axios"
 import ComplaintCard from "@/components/ComplaintCard"
 import {
@@ -19,6 +20,7 @@ const statusFilterOptions = [
 ]
 
 export default function WardenDashboardPage() {
+  const router = useRouter()
   const [token, setToken] = useState("")
   const [complaints, setComplaints] = useState([])
   const [workers, setWorkers] = useState([])
@@ -49,6 +51,18 @@ export default function WardenDashboardPage() {
   const fetchDashboardData = async (authToken) => {
     setLoading(true)
     try {
+      // Check user status first
+      const userRes = await axios.get(`${BASE_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      })
+
+      if (userRes.data?.status !== "active") {
+        router.replace("/auth/pending-approval")
+        return
+      }
+
       const complaintRes = await getAllComplaints(authToken)
       const normalizedComplaints = Array.isArray(complaintRes)
         ? complaintRes

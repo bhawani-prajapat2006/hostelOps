@@ -16,6 +16,12 @@ class UserRoleEnum(str, enum.Enum):
     admin = "admin"
 
 
+class UserStatusEnum(str, enum.Enum):
+    pending = "pending"      # Awaiting admin approval
+    active = "active"        # Approved and active
+    inactive = "inactive"    # Deactivated by admin
+
+
 class ComplaintStatusEnum(str, enum.Enum):
     open = "open"
     in_progress = "in_progress"
@@ -41,6 +47,7 @@ class User(Base):
     email = Column(String, nullable=False, unique=True, index=True)
     password = Column(String, nullable=True)  # nullable for Google OAuth users
     role = Column(Enum(UserRoleEnum), default=UserRoleEnum.student, nullable=False)
+    status = Column(Enum(UserStatusEnum), default=UserStatusEnum.active, nullable=False)  # pending for worker/warden, active otherwise
     auth_provider = Column(String, default="local", nullable=False)  # "local" or "google"
 
     # Student profile fields

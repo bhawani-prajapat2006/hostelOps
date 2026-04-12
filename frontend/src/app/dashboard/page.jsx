@@ -42,9 +42,17 @@ export default function Dashboard() {
       const userRes = await api.get("/api/v1/auth/me")
       const userData = userRes.data
 
-      // Send wardens to their dedicated dashboard.
+      // Send to role-specific dashboards
       if (userData.role === "warden") {
         router.replace("/dashboard/warden")
+        return
+      }
+      if (userData.role === "admin") {
+        router.replace("/dashboard/admin")
+        return
+      }
+      if (userData.role === "worker") {
+        router.replace("/dashboard/worker")
         return
       }
 
@@ -99,9 +107,9 @@ export default function Dashboard() {
         ]
       case "admin":
         return [
-          { label: "System Controls", icon: Settings, href: "/admin/settings" },
-          { label: "Manage Wardens", icon: UserPlus, href: "/admin/wardens" },
-          { label: "Override Status", icon: ShieldCheck, href: "/admin/status" },
+          { label: "System Controls", icon: Settings, href: "/dashboard/admin" },
+          { label: "Approvals", icon: UserPlus, href: "/dashboard/admin/approvals" },
+          { label: "Dashboard", icon: ShieldCheck, href: "/dashboard/admin" },
         ]
       default:
         return []
