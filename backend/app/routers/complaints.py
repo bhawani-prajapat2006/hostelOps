@@ -23,10 +23,32 @@ def create_complaint(
     complaint: ComplaintCreate,
     current_user: dict = Depends(require_active_status),
     db: Session = Depends(get_db),
+    hostel_id: Optional[int] = Query(None),
 ):
-    """Students and wardens can create complaints (must be active)."""
-    if current_user["role"] not in (models.UserRoleEnum.student.value, models.UserRoleEnum.warden.value):
-        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Only students and wardens can create complaints")
+    """Students, wardens, and admin can create complaints (must be active)."""
+    if current_user["role"] not in (models.UserRoleEnum.student.value, models.UserRoleEnum.warden.value, models.UserRoleEnum.admin.value):
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Only students, wardens, and admins can create complaints")
+
+    # Get the user
+    user = db.get(models.User, current_user["id"])
+
+    # Determine hostel_id based on role
+    if current_user["role"] == "admin":
+        # Admin must provide hostel_id
+        if not hostel_id:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Admin must select a hostel when creating a complaint",
+            )
+        complaint_hostel_id = hostel_id
+    else:
+        # Students and wardens use their assigned hostel
+        if not user.hostel_id:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="You must be assigned to a hostel to create complaints. Please update your profile.",
+            )
+        complaint_hostel_id = user.hostel_id
 
     db_complaint = models.Complaint(
         title=complaint.title,
@@ -34,6 +56,7 @@ def create_complaint(
         category=models.ComplaintCategoryEnum(complaint.category.value),
         image_url=complaint.image_url,
         created_by=current_user["id"],
+        hostel_id=complaint_hostel_id,  # Set based on role
     )
     db.add(db_complaint)
     db.commit()
@@ -56,7 +79,10 @@ def create_complaint(
 @router.get("/my", response_model=List[ComplaintPublic])
 def my_complaints(current_user: dict = Depends(require_active_status), db: Session = Depends(get_db)):
     """Return complaints created by the current user."""
-    complaints = db.query(models.Complaint).filter(
+    from sqlalchemy.orm import selectinload
+    complaints = db.query(models.Complaint).options(
+        selectinload(models.Complaint.assigned_worker)
+    ).filter(
         models.Complaint.created_by == current_user["id"]
     ).order_by(models.Complaint.created_at.desc()).all()
     return complaints
@@ -70,7 +96,10 @@ def assigned_complaints(
     db: Session = Depends(get_db),
 ):
     """Workers: see complaints assigned to them."""
-    complaints = db.query(models.Complaint).filter(
+    from sqlalchemy.orm import selectinload
+    complaints = db.query(models.Complaint).options(
+        selectinload(models.Complaint.assigned_worker)
+    ).filter(
         models.Complaint.assigned_to == current_user["id"]
     ).order_by(models.Complaint.created_at.desc()).all()
     return complaints
@@ -92,7 +121,24 @@ def list_complaints(
     search: Optional[str] = Query(None, min_length=1, max_length=200, description="Search in title/description"),
 ):
     """List all complaints with pagination, filtering, sorting, and search."""
-    query = db.query(models.Complaint)
+    from sqlalchemy.orm import selectinload
+    query = db.query(models.Complaint).options(
+        selectinload(models.Complaint.assigned_worker)
+    )
+
+    # Hostel-based access control
+    if current_user["role"] in ("student", "worker", "warden"):
+        # Non-admins can only see complaints from their hostel
+        user = db.get(models.User, current_user["id"])
+        if not user.hostel_id:
+            # Return empty list if not assigned to hostel
+            return {
+                "complaints": [],
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+            }
+        query = query.filter(models.Complaint.hostel_id == user.hostel_id)
 
     # Full-text search (case-insensitive LIKE)
     if search:
@@ -130,7 +176,8 @@ def list_complaints(
 
 @router.get("/{complaint_id}", response_model=ComplaintPublic)
 def get_complaint(complaint_id: int, current_user: dict = Depends(require_active_status), db: Session = Depends(get_db)):
-    complaint = db.get(models.Complaint, complaint_id)
+    from sqlalchemy.orm import selectinload
+    complaint = db.query(models.Complaint).options(selectinload(models.Complaint.assigned_worker)).filter(models.Complaint.id == complaint_id).first()
     if not complaint:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
     return complaint
@@ -150,7 +197,10 @@ def get_complaint_history(complaint_id: int, current_user: dict = Depends(requir
 
 @router.put("/{complaint_id}", response_model=ComplaintPublic)
 def update_complaint(complaint_id: int, complaint: ComplaintUpdate, current_user: dict = Depends(require_active_status), db: Session = Depends(get_db)):
-    existing = db.get(models.Complaint, complaint_id)
+    from sqlalchemy.orm import selectinload
+    existing = db.query(models.Complaint).options(
+        selectinload(models.Complaint.assigned_worker)
+    ).filter(models.Complaint.id == complaint_id).first()
     if not existing:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
 
@@ -202,7 +252,10 @@ def assign_complaint(
     db: Session = Depends(get_db),
 ):
     """Warden/Admin assigns a worker to a complaint."""
-    complaint = db.get(models.Complaint, complaint_id)
+    from sqlalchemy.orm import selectinload
+    complaint = db.query(models.Complaint).options(
+        selectinload(models.Complaint.assigned_worker)
+    ).filter(models.Complaint.id == complaint_id).first()
     if not complaint:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
 
@@ -229,6 +282,35 @@ def assign_complaint(
     db.commit()
     db.refresh(complaint)
     return complaint
+
+
+# ───── Get available workers ─────
+
+@router.get("/{complaint_id}/available-workers", response_model=list)
+def get_available_workers(
+    complaint_id: int,
+    current_user: dict = Depends(require_role_and_active("warden", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Get available workers for a complaint (matching work type).
+
+    Workers are independent and NOT assigned to hostels.
+    Only filtering by active status and matching work_type.
+    """
+    complaint = db.get(models.Complaint, complaint_id)
+    if not complaint:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
+
+    # Get all active workers with matching work type
+    # Workers are independent - no hostel assignment needed
+    workers = db.query(models.User).filter(
+        models.User.role == models.UserRoleEnum.worker,
+        models.User.status == models.UserStatusEnum.active,
+        models.User.work_type == complaint.category.value,
+    ).all()
+
+    from app.schemas.user import UserPublic
+    return [UserPublic.model_validate(w) for w in workers]
 
 
 # ───── Delete (with ownership check) ─────

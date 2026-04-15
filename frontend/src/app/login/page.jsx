@@ -2,17 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import axios from "axios"
+import api from "@/lib/api"
 import { GoogleLogin } from "@react-oauth/google"
 import { Mail, Lock, User, AlertCircle, CheckCircle } from "lucide-react"
 
 const routeByRole = async (token, router) => {
   try {
-    const meRes = await axios.get("http://127.0.0.1:8000/api/v1/auth/me", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const meRes = await api.get("/api/v1/auth/me")
 
     const role = meRes.data?.role
     const status = meRes.data?.status
@@ -71,12 +67,12 @@ export default function AuthPage() {
     try {
       let res
       if (mode === "login") {
-        res = await axios.post("http://127.0.0.1:8000/api/v1/auth/login", {
+        res = await api.post("/api/v1/auth/login", {
           email,
           password,
         })
       } else {
-        res = await axios.post("http://127.0.0.1:8000/api/v1/auth/register", {
+        res = await api.post("/api/v1/auth/register", {
           username,
           email,
           password,
@@ -89,7 +85,7 @@ export default function AuthPage() {
       if (refresh_token) {
         localStorage.setItem("refresh_token", refresh_token)
       }
-      
+
       setSuccess(mode === "login" ? "Welcome back!" : "Account created!")
       setTimeout(() => {
         routeByRole(access_token, router)
@@ -105,8 +101,8 @@ export default function AuthPage() {
     setLoading(true)
     setError("")
     try {
-      const res = await axios.post(
-        "http://127.0.0.1:8000/api/v1/auth/google",
+      const res = await api.post(
+        "/api/v1/auth/google",
         {
           id_token: credentialResponse.credential
         }

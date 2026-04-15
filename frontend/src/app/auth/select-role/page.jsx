@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Zap, CheckCircle2, AlertCircle } from "lucide-react"
-import axios from "axios"
+import api from "@/lib/api"
 
 export default function SelectRolePage() {
   const router = useRouter()
@@ -26,11 +26,7 @@ export default function SelectRolePage() {
         return
       }
 
-      const meRes = await axios.get("http://127.0.0.1:8000/api/v1/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const meRes = await api.get("/api/v1/auth/me")
 
       const userData = meRes.data
 
@@ -58,16 +54,10 @@ export default function SelectRolePage() {
     try {
       setSubmitting(true)
       setError("")
-      const token = localStorage.getItem("access_token")
 
-      await axios.post(
-        "http://127.0.0.1:8000/api/v1/auth/select-role",
-        { role: selectedRole },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      await api.post(
+        "/api/v1/auth/select-role",
+        { role: selectedRole }
       )
 
       // Redirect based on selected role

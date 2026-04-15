@@ -21,17 +21,56 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notification, setNotification] = useState({ show: false, message: "", type: "" })
+  const [hostels, setHostels] = useState([])
+  const [selectedHostel, setSelectedHostel] = useState(null)
 
   const [formData, setFormData] = useState({
     phone: "",
     hostel_name: "",
     room_number: "",
     batch: "",
+    work_type: "",
   })
 
+  // Generate room numbers dynamically based on selected hostel's total_rooms
+  const generateRoomNumbers = () => {
+    if (!selectedHostel || !selectedHostel.total_rooms) {
+      return []
+    }
+    const rooms = []
+    for (let i = 1; i <= selectedHostel.total_rooms; i++) {
+      rooms.push(String(i))
+    }
+    return rooms
+  }
+  const roomNumbers = generateRoomNumbers()
+
   useEffect(() => {
-    fetchUser()
+    // Fetch hostels first, then user data
+    const loadData = async () => {
+      await fetchHostels()
+      await fetchUser()
+    }
+    loadData()
   }, [])
+
+  // Update selectedHostel when formData or hostels change
+  useEffect(() => {
+    if (formData.hostel_name && hostels.length > 0) {
+      const hostel = hostels.find(h => h.name === formData.hostel_name)
+      setSelectedHostel(hostel || null)
+    }
+  }, [hostels, formData.hostel_name])
+
+  const fetchHostels = async () => {
+    try {
+      const res = await api.get("/api/v1/hostels/")
+      const hostelsList = Array.isArray(res.data) ? res.data : []
+      setHostels(hostelsList)
+    } catch (err) {
+      console.error("Failed to load hostels:", err)
+    }
+  }
 
   const fetchUser = async () => {
     try {
@@ -42,6 +81,7 @@ export default function ProfilePage() {
         hostel_name: res.data.hostel_name || "",
         room_number: res.data.room_number || "",
         batch: res.data.batch || "",
+        work_type: res.data.work_type || "",
       })
     } catch (err) {
       showNotification("Failed to load profile", "error")
@@ -53,6 +93,13 @@ export default function ProfilePage() {
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+
+    // When hostel is changed, update selectedHostel and clear room_number
+    if (name === "hostel_name") {
+      const hostel = hostels.find(h => h.name === value)
+      setSelectedHostel(hostel || null)
+      setFormData(prev => ({ ...prev, room_number: "" })) // Clear room when hostel changes
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -67,15 +114,40 @@ export default function ProfilePage() {
         payload.hostel_name = formData.hostel_name || undefined
         payload.room_number = formData.room_number || undefined
         payload.batch = formData.batch || undefined
+
+        // Validate hostel is selected
+        if (!formData.hostel_name) {
+          showNotification("Please select a hostel", "error")
+          setSaving(false)
+          return
+        }
+
+        // Look up hostel_id by finding hostel with matching name
+        const hostel = hostels.find(h => h.name === formData.hostel_name)
+        if (!hostel || !hostel.id) {
+          showNotification("Hostel not found. Please refresh and try again.", "error")
+          setSaving(false)
+          return
+        }
+
+        console.log("Sending hostel_id:", hostel.id, "for hostel:", formData.hostel_name)
+        payload.hostel_id = hostel.id
+      }
+
+      if (user?.role === "worker") {
+        payload.work_type = formData.work_type || undefined
       }
 
       // Remove undefined values
       Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key])
 
+      console.log("Profile update payload:", payload)
       const res = await api.put("/api/v1/auth/me", payload)
+      console.log("Profile response:", res.data)
       setUser(res.data)
       showNotification("Profile updated successfully!", "success")
     } catch (err) {
+      console.error("Profile update error:", err)
       showNotification(err.response?.data?.detail || "Failed to update profile", "error")
     } finally {
       setSaving(false)
@@ -231,16 +303,20 @@ export default function ProfilePage() {
                       </span>
                       <span className="label-text-alt text-error">*</span>
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="hostel_name"
-                      placeholder="e.g., H1, H2, H3..."
-                      className="input input-bordered"
+                      className="select select-bordered"
                       value={formData.hostel_name}
                       onChange={handleChange}
-                      maxLength="100"
                       required
-                    />
+                    >
+                      <option value="">Select your hostel...</option>
+                      {hostels.map(hostel => (
+                        <option key={hostel.id} value={hostel.name}>
+                          {hostel.name}
+                        </option>
+                      ))}
+                    </select>
                     <label className="label">
                       <span className="label-text-alt text-xs text-base-content/50">
                         Required for creating complaints
@@ -255,16 +331,20 @@ export default function ProfilePage() {
                       </span>
                       <span className="label-text-alt text-error">*</span>
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="room_number"
-                      placeholder="e.g., 101, 202..."
-                      className="input input-bordered"
+                      className="select select-bordered"
                       value={formData.room_number}
                       onChange={handleChange}
-                      maxLength="20"
                       required
-                    />
+                    >
+                      <option value="">Select your room...</option>
+                      {roomNumbers.map(room => (
+                        <option key={room} value={room}>
+                          Room {room}
+                        </option>
+                      ))}
+                    </select>
                     <label className="label">
                       <span className="label-text-alt text-xs text-base-content/50">
                         Required for creating complaints
@@ -292,24 +372,52 @@ export default function ProfilePage() {
               )}
 
               {/* Worker/Warden assigned hostel - read only */}
-              {(user?.role === "worker" || user?.role === "warden") && (
+              {(user?.role === "warden") && (
+                <>
+                  <div className="form-control md:col-span-2">
+                    <label className="label">
+                      <span className="label-text font-bold flex items-center gap-2">
+                        <Home className="w-4 h-4" /> Assigned Hostel
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.hostel_name || "Not assigned yet"}
+                      className="input input-bordered bg-base-100"
+                      disabled
+                    />
+                    <label className="label">
+                      <span className="label-text-alt text-xs text-base-content/50">
+                        Assigned by: Admin - Contact your admin for hostel assignment
+                      </span>
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {/* Worker Work Type */}
+              {user?.role === "worker" && (
                 <div className="form-control md:col-span-2">
                   <label className="label">
-                    <span className="label-text font-bold flex items-center gap-2">
-                      <Home className="w-4 h-4" /> Assigned Hostel
-                    </span>
+                    <span className="label-text font-bold">Work Type</span>
                   </label>
-                  <input
-                    type="text"
-                    value={formData.hostel_name || "Not assigned yet"}
-                    className="input input-bordered bg-base-100"
-                    disabled
-                  />
+                  <select
+                    name="work_type"
+                    className="select select-bordered"
+                    value={formData.work_type}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select your work type...</option>
+                    <option value="plumbing">🔧 Plumbing</option>
+                    <option value="electrical">⚡ Electrical</option>
+                    <option value="cleanliness">🧹 Cleanliness</option>
+                    <option value="network">📡 Network</option>
+                    <option value="furniture">🪑 Furniture</option>
+                    <option value="other">📋 Other</option>
+                  </select>
                   <label className="label">
                     <span className="label-text-alt text-xs text-base-content/50">
-                      {user?.role === "worker"
-                        ? "Assigned by: Warden - Contact your warden for hostel assignment"
-                        : "Assigned by: Admin - Contact your admin for hostel assignment"}
+                      Select the type of work you do - this determines which complaints you can be assigned to
                     </span>
                   </label>
                 </div>
@@ -360,17 +468,14 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {user?.role === "worker" && !formData.hostel_name && (
+      {user?.role === "worker" && !formData.work_type && (
         <div className="alert bg-warning/10 border-warning/30 text-warning-content">
           <AlertCircle className="w-5 h-5" />
           <div>
-            <h3 className="font-bold">⚠️ WORKER: No Hostel Assigned</h3>
+            <h3 className="font-bold">⚠️ WORKER: Set Your Work Type</h3>
             <p className="text-xs mt-1">
-              {user?.status === "pending"
-                ? "🔄 PENDING: Once the ADMIN approves you → Your WARDEN will assign you to a hostel."
-                : "📞 ACTIVE: Contact your WARDEN for hostel assignment immediately."}
+              Your work type determines which complaints you can be assigned to. Select your specialization above.
             </p>
-            <p className="text-xs text-base-content/50 mt-2">[role={user?.role}, status={user?.status}]</p>
           </div>
         </div>
       )}

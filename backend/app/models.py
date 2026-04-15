@@ -37,6 +37,28 @@ class ComplaintCategoryEnum(str, enum.Enum):
     other = "other"
 
 
+# ───── Hostels ─────
+
+class Hostel(Base):
+    __tablename__ = "hostels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    address = Column(String(255), nullable=True)
+    total_rooms = Column(Integer, nullable=True)  # Total rooms in hostel
+    capacity = Column(Integer, nullable=True)  # Max students overall
+    warden_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Assigned warden
+    description = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    # Relationships
+    users = relationship("User", foreign_keys="[User.hostel_id]", back_populates="hostel")
+    complaints = relationship("Complaint", foreign_keys="[Complaint.hostel_id]", back_populates="hostel")
+    warden = relationship("User", foreign_keys="[Hostel.warden_id]")
+
+
 # ───── Users ─────
 
 class User(Base):
@@ -50,6 +72,12 @@ class User(Base):
     status = Column(Enum(UserStatusEnum), default=UserStatusEnum.active, nullable=False)  # pending for worker/warden, active otherwise
     auth_provider = Column(String, default="local", nullable=False)  # "local" or "google"
 
+    # Hostel assignment (for students, workers, wardens)
+    hostel_id = Column(Integer, ForeignKey("hostels.id"), nullable=True)
+
+    # Worker work type (for workers only)
+    work_type = Column(String(50), nullable=True)  # e.g., "plumbing", "electrical", etc.
+
     # Student profile fields
     phone = Column(String(15), nullable=True)
     hostel_name = Column(String(100), nullable=True)
@@ -59,6 +87,8 @@ class User(Base):
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
 
+    # Relationships
+    hostel = relationship("Hostel", foreign_keys="[User.hostel_id]", back_populates="users")
     complaints = relationship("Complaint", foreign_keys="[Complaint.created_by]", back_populates="creator", cascade="all, delete-orphan")
 
 
@@ -76,11 +106,15 @@ class Complaint(Base):
     status = Column(Enum(ComplaintStatusEnum), default=ComplaintStatusEnum.open, nullable=False)
     image_url = Column(String(512), nullable=True)
 
+    # Hostel this complaint is from
+    hostel_id = Column(Integer, ForeignKey("hostels.id"), nullable=False)
+
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
 
     creator = relationship("User", foreign_keys=[created_by], back_populates="complaints")
     assigned_worker = relationship("User", foreign_keys=[assigned_to])
+    hostel = relationship("Hostel", foreign_keys="[Complaint.hostel_id]", back_populates="complaints")
     history = relationship("ComplaintHistory", back_populates="complaint", cascade="all, delete-orphan", order_by="ComplaintHistory.created_at")
 
 

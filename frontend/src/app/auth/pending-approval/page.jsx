@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Clock, AlertCircle, LogOut, RefreshCw } from "lucide-react"
-import axios from "axios"
+import api from "@/lib/api"
 
 export default function PendingApprovalPage() {
   const router = useRouter()
@@ -24,11 +24,7 @@ export default function PendingApprovalPage() {
         return
       }
 
-      const meRes = await axios.get("http://127.0.0.1:8000/api/v1/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const meRes = await api.get("/api/v1/auth/me")
 
       const userData = meRes.data
 

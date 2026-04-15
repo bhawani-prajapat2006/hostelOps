@@ -544,6 +544,10 @@ export default function AdminDashboard() {
             <div className="card-body">
               <h3 className="card-title text-lg">Admin Controls</h3>
               <div className="space-y-2 mt-3">
+                <Link href="/dashboard/admin/hostels" className="btn btn-sm btn-info btn-block justify-start gap-2">
+                  <Settings className="w-4 h-4" />
+                  Manage Hostels
+                </Link>
                 <Link href="/dashboard/admin/approvals" className="btn btn-sm btn-primary btn-block justify-start gap-2">
                   <CheckCircle2 className="w-4 h-4" />
                   User Approvals

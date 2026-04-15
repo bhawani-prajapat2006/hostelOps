@@ -218,7 +218,7 @@ def select_role(
     if not user:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="User not found")
 
-    role = models.UserRoleEnum(str(payload.role))
+    role = models.UserRoleEnum(payload.role.value)
     user.role = role
     user.status = models.UserStatusEnum.active if role == models.UserRoleEnum.student else models.UserStatusEnum.pending
     db.commit()

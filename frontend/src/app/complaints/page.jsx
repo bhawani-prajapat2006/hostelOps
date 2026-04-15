@@ -47,6 +47,7 @@ export default function Complaints() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [complaints, setComplaints] = useState([])
+  const [hostels, setHostels] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [toasts, setToasts] = useState([])
@@ -56,6 +57,7 @@ export default function Complaints() {
   const [deleting, setDeleting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
+    hostel_id: "",
     title: "",
     description: "",
     category: "other",
@@ -65,6 +67,22 @@ export default function Complaints() {
   useEffect(() => {
     fetchUserAndComplaints()
   }, [])
+
+  // Fetch hostels if user is admin
+  useEffect(() => {
+    if (user?.role === "admin") {
+      fetchHostels()
+    }
+  }, [user])
+
+  const fetchHostels = async () => {
+    try {
+      const res = await api.get("/api/v1/hostels/")
+      setHostels(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      console.error("Failed to load hostels:", err)
+    }
+  }
 
   const fetchUserAndComplaints = async () => {
     try {
@@ -83,13 +101,22 @@ export default function Complaints() {
       // Then fetch complaints based on role
       let endpoint
       if (userData.role === "worker") {
+        // Workers see assigned complaints
         endpoint = "/api/v1/complaints/assigned"
-      } else {
+      } else if (userData.role === "student") {
+        // Students see only their own complaints
         endpoint = "/api/v1/complaints/my"
+      } else {
+        // Wardens and admins see all complaints (filtered by hostel/system-wide)
+        endpoint = "/api/v1/complaints/"
       }
 
       const res = await api.get(endpoint)
-      setComplaints(Array.isArray(res.data) ? res.data : [])
+      // Handle both paginated and simple array responses
+      const complaintsList = endpoint === "/api/v1/complaints/"
+        ? (res.data?.complaints || [])
+        : (Array.isArray(res.data) ? res.data : [])
+      setComplaints(complaintsList)
     } catch (err) {
       addToast("Failed to load complaints", "error")
     } finally {
@@ -102,13 +129,22 @@ export default function Complaints() {
       // Refetch complaints based on user role
       let endpoint
       if (user?.role === "worker") {
+        // Workers see assigned complaints
         endpoint = "/api/v1/complaints/assigned"
-      } else {
+      } else if (user?.role === "student") {
+        // Students see only their own complaints
         endpoint = "/api/v1/complaints/my"
+      } else {
+        // Wardens and admins see all complaints (filtered by hostel/system-wide)
+        endpoint = "/api/v1/complaints/"
       }
 
       const res = await api.get(endpoint)
-      setComplaints(Array.isArray(res.data) ? res.data : []) 
+      // Handle both paginated and simple array responses
+      const complaintsList = endpoint === "/api/v1/complaints/"
+        ? (res.data?.complaints || [])
+        : (Array.isArray(res.data) ? res.data : [])
+      setComplaints(complaintsList)
     } catch (err) {
       addToast("Failed to load complaints", "error")
     } finally {
@@ -154,6 +190,25 @@ export default function Complaints() {
     setSubmitting(true)
 
     try {
+      // Validate hostel based on role
+      if (user?.role === "student" && !user?.hostel_id) {
+        addToast("Please complete your profile with hostel and room number first", "error")
+        setSubmitting(false)
+        return
+      }
+
+      if (user?.role === "warden" && !user?.hostel_id) {
+        addToast("You must be assigned to a hostel to create complaints", "error")
+        setSubmitting(false)
+        return
+      }
+
+      if (user?.role === "admin" && !formData.hostel_id) {
+        addToast("Please select a hostel for this complaint", "error")
+        setSubmitting(false)
+        return
+      }
+
       if (formData.title.trim().length < 3) {
         addToast("Title must be at least 3 characters", "error")
         setSubmitting(false)
@@ -173,10 +228,17 @@ export default function Complaints() {
         ...(formData.image_url && { image_url: formData.image_url })
       }
 
-      await api.post("/api/v1/complaints", payload)
+      // For admin, pass hostel_id as query parameter
+      let url = "/api/v1/complaints"
+      if (user?.role === "admin") {
+        url += `?hostel_id=${formData.hostel_id}`
+      }
+
+      await api.post(url, payload)
       addToast("Complaint filed successfully!", "success")
-      
+
       setFormData({
+        hostel_id: "",
         title: "",
         description: "",
         category: "other",
@@ -194,6 +256,7 @@ export default function Complaints() {
   const closeModal = () => {
     setModalOpen(false)
     setFormData({
+      hostel_id: "",
       title: "",
       description: "",
       category: "other",
@@ -260,13 +323,39 @@ export default function Complaints() {
           <h1 className="text-4xl font-bold">Complaints</h1>
           <p className="text-base-content/60 mt-1 font-medium">Resolution Center • IIT Jodhpur</p>
         </div>
-        <button 
-          onClick={() => setModalOpen(true)}
-          className="btn btn-primary btn-lg gap-2"
-        >
-          <Plus className="w-5 h-5" /> New Complaint
-        </button>
+        {user?.role === "student" && (!user?.hostel_name || !user?.room_number) ? (
+          <Link href="/profile" className="btn btn-warning btn-lg gap-2">
+            ⚠️ Complete Profile First
+          </Link>
+        ) : (
+          <button
+            onClick={() => setModalOpen(true)}
+            className="btn btn-primary btn-lg gap-2"
+          >
+            <Plus className="w-5 h-5" /> New Complaint
+          </button>
+        )}
       </div>
+
+      {/* Profile Completion Alert for Students */}
+      {user?.role === "student" && (!user?.hostel_name || !user?.room_number) && (
+        <div className="alert alert-warning shadow-lg">
+          <AlertCircle className="w-6 h-6" />
+          <div>
+            <h3 className="font-bold">Complete Your Profile</h3>
+            <div className="text-sm mt-1">
+              To file complaints, you must complete your profile with:
+              <ul className="list-disc list-inside mt-2">
+                {!user?.hostel_name && <li>Your Hostel Name</li>}
+                {!user?.room_number && <li>Your Room Number</li>}
+              </ul>
+            </div>
+          </div>
+          <Link href="/profile" className="btn btn-sm btn-outline">
+            Go to Profile
+          </Link>
+        </div>
+      )}
 
       {/* Search & Filter */}
       <div className="flex gap-4 items-center">
@@ -367,6 +456,105 @@ export default function Complaints() {
             {/* Modal Body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
+              {/* Student Hostel Display (Read-only) */}
+              {user?.role === "student" && user?.hostel_name && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text font-bold">Hostel</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={user.hostel_name}
+                        className="input input-bordered bg-base-200"
+                        disabled
+                      />
+                      <label className="label">
+                        <span className="label-text-alt text-xs text-base-content/50">
+                          Set in your profile
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text font-bold">Room Number</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={user.room_number}
+                        className="input input-bordered bg-base-200"
+                        disabled
+                      />
+                      <label className="label">
+                        <span className="label-text-alt text-xs text-base-content/50">
+                          Set in your profile
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="divider my-2"></div>
+                </>
+              )}
+
+              {/* Warden Hostel Display (Read-only) */}
+              {user?.role === "warden" && (
+                <>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text font-bold">Hostel</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={user.hostel_name || "Not assigned"}
+                      className="input input-bordered bg-base-200"
+                      disabled
+                    />
+                    <label className="label">
+                      <span className="label-text-alt text-xs text-base-content/50">
+                        All complaints will be for this hostel
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="divider my-2"></div>
+                </>
+              )}
+
+              {/* Admin Hostel Selection (Editable Dropdown) */}
+              {user?.role === "admin" && (
+                <>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text font-bold">Hostel *</span>
+                    </label>
+                    <select
+                      name="hostel_id"
+                      value={formData.hostel_id}
+                      onChange={handleChange}
+                      className="select select-bordered bg-base-200"
+                      required
+                    >
+                      <option value="">Select a hostel...</option>
+                      {hostels.map(hostel => (
+                        <option key={hostel.id} value={hostel.id}>
+                          {hostel.name}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="label">
+                      <span className="label-text-alt text-xs text-base-content/50">
+                        Select which hostel this complaint is for
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="divider my-2"></div>
+                </>
+              )}
+
               {/* Title Field */}
               <div className="form-control">
                 <label className="label">
@@ -391,6 +579,8 @@ export default function Complaints() {
                   </span>
                 </label>
               </div>
+
+              {/* Hostel/Room info is now displayed at the top of the form */}
 
               {/* Category Selection */}
               <div className="form-control">

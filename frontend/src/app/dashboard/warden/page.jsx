@@ -2,15 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import axios from "axios"
+import api from "@/lib/api"
 import ComplaintCard from "@/components/ComplaintCard"
 import {
   assignWorker,
   getAllComplaints,
   updateStatus,
 } from "@/services/complaintService"
-
-const BASE_URL = "http://localhost:8000/api/v1"
 
 const statusFilterOptions = [
   { label: "All", value: "all" },
@@ -23,7 +21,7 @@ export default function WardenDashboardPage() {
   const router = useRouter()
   const [token, setToken] = useState("")
   const [complaints, setComplaints] = useState([])
-  const [workers, setWorkers] = useState([])
+  const [user, setUser] = useState(null)
   const [statusFilter, setStatusFilter] = useState("all")
   const [loading, setLoading] = useState(true)
   const [assigning, setAssigning] = useState(false)
@@ -52,11 +50,9 @@ export default function WardenDashboardPage() {
     setLoading(true)
     try {
       // Check user status first
-      const userRes = await axios.get(`${BASE_URL}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      })
+      const userRes = await api.get("/api/v1/auth/me")
+
+      setUser(userRes.data)
 
       if (userRes.data?.status !== "active") {
         router.replace("/auth/pending-approval")
@@ -70,15 +66,6 @@ export default function WardenDashboardPage() {
           ? complaintRes.complaints
           : []
       setComplaints(normalizedComplaints)
-
-      // Backend lists users with pagination; filter workers on frontend.
-      const usersRes = await axios.get(`${BASE_URL}/users/`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      })
-      const allUsers = Array.isArray(usersRes.data?.users) ? usersRes.data.users : []
-      setWorkers(allUsers.filter((user) => user.role === "worker"))
     } catch (error) {
       console.error("Failed to load warden dashboard data:", error)
     } finally {
@@ -128,6 +115,11 @@ export default function WardenDashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Warden Dashboard</h1>
           <p className="text-base-content/70 mt-1">Manage all complaints, assignments, and status updates.</p>
+          {user?.hostel_name && (
+            <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20 inline-block">
+              <p className="text-sm font-semibold text-primary">📍 Assigned Hostel: <span className="font-bold text-lg">{user.hostel_name}</span></p>
+            </div>
+          )}
         </div>
 
         <div className="w-full md:w-64">
@@ -162,11 +154,11 @@ export default function WardenDashboardPage() {
             <ComplaintCard
               key={complaint.id}
               complaint={complaint}
-              workers={workers}
               onAssignWorker={handleAssignWorker}
               onUpdateStatus={handleUpdateStatus}
               assigning={assigning}
               updating={updating}
+              token={token}
             />
           ))}
         </div>

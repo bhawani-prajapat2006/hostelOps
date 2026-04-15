@@ -318,7 +318,25 @@ export default function WorkerDashboard() {
         {/* Sidebar - Quick Info */}
         <div className="flex flex-col gap-6">
 
-          {/* Task Summary */}
+          {/* Assigned Hostel */}
+          {user?.hostel_name && (
+            <div className="card bg-gradient-to-br from-primary/10 to-primary/5 shadow-lg border border-primary/20">
+              <div className="card-body">
+                <h3 className="card-title text-lg flex items-center gap-2">
+                  📍 Assigned Hostel
+                </h3>
+                <p className="text-2xl font-bold text-primary mt-2">{user.hostel_name}</p>
+                {user?.specialization && (
+                  <p className="text-sm text-base-content/70 mt-2">
+                    Specialization: <span className="font-bold capitalize">{user.specialization}</span>
+                  </p>
+                )}
+                <p className="text-xs text-base-content/60 mt-1">
+                  All tasks are from this hostel
+                </p>
+              </div>
+            </div>
+          )}
           <div className="card bg-base-100 shadow-lg border border-base-300">
             <div className="card-body">
               <h3 className="card-title text-lg flex items-center gap-2">

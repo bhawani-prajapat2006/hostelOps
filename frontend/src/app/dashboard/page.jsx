@@ -89,7 +89,7 @@ export default function Dashboard() {
     switch (user.role) {
       case "student":
         return [
-          { label: "Post New Complaint", icon: PlusCircle, href: "/complaints/new" },
+          { label: "Post New Complaint", icon: PlusCircle, href: "/complaints" },
           { label: "My Profile", icon: User, href: "/profile" },
           { label: "Resolution Archive", icon: History, href: "/archive" },
         ]

@@ -387,9 +387,20 @@ export default function ComplaintDetailPage() {
                 <p className="text-xs text-base-content/60 uppercase font-bold mb-2 flex items-center gap-1">
                   <Wrench className="w-3 h-3" /> Assigned To
                 </p>
-                <p className="text-sm font-semibold bg-base-100 p-3 rounded-lg">
-                  {complaint.assigned_worker?.username || "Unassigned"}
-                </p>
+                {complaint.assigned_worker ? (
+                  <div className="text-sm font-semibold bg-base-100 p-3 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span>{complaint.assigned_worker.username}</span>
+                      {complaint.assigned_worker.work_type && (
+                        <span className="badge badge-sm badge-info">{complaint.assigned_worker.work_type}</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold bg-base-100 p-3 rounded-lg text-base-content/50">
+                    Unassigned
+                  </p>
+                )}
               </div>
 
               {/* Created At */}

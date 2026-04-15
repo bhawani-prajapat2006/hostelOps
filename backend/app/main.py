@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.schemas.user import Message, PaginatedUsers
-from app.routers import complaints_router, auth_router
+from app.routers import complaints_router, auth_router, hostels_router
 from app.db.database import engine, get_db, Base, _get_session_local
 from app import models
 from app.core.auth import get_current_user, require_role, require_role_and_active, require_active_status
@@ -68,10 +68,12 @@ async def startup_cleanup():
 # ───── API v1 ─────
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(complaints_router, prefix="/api/v1/complaints", tags=["Complaints"])
+app.include_router(hostels_router, prefix="/api/v1/hostels", tags=["Hostels"])
 
 # Keep un-prefixed routes for backwards compatibility
 app.include_router(auth_router, prefix="/auth", tags=["Auth (compat)"], include_in_schema=False)
 app.include_router(complaints_router, prefix="/complaints", tags=["Complaints (compat)"], include_in_schema=False)
+app.include_router(hostels_router, prefix="/hostels", tags=["Hostels (compat)"], include_in_schema=False)
 
 
 @app.get("/", status_code=HTTPStatus.OK, response_model=Message)
@@ -89,8 +91,18 @@ def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    """Admin/Warden: list all users with pagination (must be active)."""
+    """Admin/Warden: list users with pagination (must be active)."""
     query = db.query(models.User)
+
+    # Wardens can only see users in their hostel
+    if current_user.get("role") == "warden":
+        user = db.get(models.User, current_user["id"])
+        if user and user.hostel_id:
+            query = query.filter(models.User.hostel_id == user.hostel_id)
+        else:
+            # Warden not assigned to hostel can't see anyone
+            return {"users": [], "total": 0, "page": page, "page_size": page_size}
+
     total = query.count()
     users = query.offset((page - 1) * page_size).limit(page_size).all()
     return {"users": users, "total": total, "page": page, "page_size": page_size}
