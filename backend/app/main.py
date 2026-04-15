@@ -5,6 +5,7 @@ from http import HTTPStatus
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, inspect, text
 
 from app.schemas.user import Message, PaginatedUsers
 from app.routers import complaints_router, auth_router, hostels_router
@@ -27,6 +28,32 @@ app.add_middleware(
 
 # create tables at startup
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_complaint_review_columns():
+    """Add new complaint review columns in existing databases when missing."""
+    try:
+        with engine.connect() as conn:
+            inspector = inspect(conn)
+            columns = {col["name"] for col in inspector.get_columns("complaints")}
+            dialect = conn.dialect.name
+
+            if "image_after_solved" not in columns:
+                conn.execute(text("ALTER TABLE complaints ADD COLUMN image_after_solved VARCHAR(512)"))
+                logger.info("Schema patch: added complaints.image_after_solved")
+
+            if "awaiting_warden_review" not in columns:
+                default_value = "false" if dialect == "postgresql" else "0"
+                conn.execute(
+                    text(
+                        f"ALTER TABLE complaints ADD COLUMN awaiting_warden_review BOOLEAN NOT NULL DEFAULT {default_value}"
+                    )
+                )
+                logger.info("Schema patch: added complaints.awaiting_warden_review")
+
+            conn.commit()
+    except Exception as e:
+        logger.exception(f"Schema patch error for complaints review columns: {e}")
 
 
 # ───── Auto-cleanup: expired tokens ─────
@@ -60,6 +87,7 @@ async def _periodic_cleanup():
 @app.on_event("startup")
 async def startup_cleanup():
     # Run once at startup
+    _ensure_complaint_review_columns()
     _cleanup_expired_tokens()
     # Schedule periodic cleanup
     asyncio.create_task(_periodic_cleanup())
@@ -98,7 +126,13 @@ def list_users(
     if current_user.get("role") == "warden":
         user = db.get(models.User, current_user["id"])
         if user and user.hostel_id:
-            query = query.filter(models.User.hostel_id == user.hostel_id)
+            query = query.filter(
+                or_(
+                    models.User.hostel_id == user.hostel_id,
+                    # Let wardens discover unassigned workers to assign into their hostel workflow.
+                    (models.User.role == models.UserRoleEnum.worker) & (models.User.hostel_id.is_(None)),
+                )
+            )
         else:
             # Warden not assigned to hostel can't see anyone
             return {"users": [], "total": 0, "page": page, "page_size": page_size}

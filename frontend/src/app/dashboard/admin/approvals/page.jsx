@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -89,7 +89,7 @@ export default function AdminApprovalPanel() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -222,7 +222,7 @@ export default function AdminApprovalPanel() {
                           className="btn btn-success btn-sm gap-2"
                         >
                           {approving === pendingUser.id ? (
-                            <span className="loading loading-spinner loading-xs"></span>
+                            <span className="loading loading-bars loading-xs"></span>
                           ) : (
                             <CheckCircle className="w-4 h-4" />
                           )}
@@ -234,7 +234,7 @@ export default function AdminApprovalPanel() {
                           className="btn btn-error btn-sm gap-2"
                         >
                           {rejectingId === pendingUser.id ? (
-                            <span className="loading loading-spinner loading-xs"></span>
+                            <span className="loading loading-bars loading-xs"></span>
                           ) : (
                             <XCircle className="w-4 h-4" />
                           )}
@@ -277,3 +277,4 @@ export default function AdminApprovalPanel() {
     </div>
   )
 }
+

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -12,7 +12,8 @@ import {
   Save,
   AlertCircle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Trash2
 } from "lucide-react"
 
 export default function ProfilePage() {
@@ -20,6 +21,8 @@ export default function ProfilePage() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [notification, setNotification] = useState({ show: false, message: "", type: "" })
   const [hostels, setHostels] = useState([])
   const [selectedHostel, setSelectedHostel] = useState(null)
@@ -159,10 +162,26 @@ export default function ProfilePage() {
     setTimeout(() => setNotification({ show: false, message: "", type: "" }), 3000)
   }
 
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
+    try {
+      await api.delete("/api/v1/auth/me")
+      localStorage.removeItem("access_token")
+      localStorage.removeItem("refresh_token")
+      router.replace("/login")
+    } catch (err) {
+      showNotification(err.response?.data?.detail || "Failed to delete account", "error")
+      setDeleting(false)
+      setDeleteModalOpen(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -198,6 +217,47 @@ export default function ProfilePage() {
       {notification.show && (
         <div className={`alert alert-${notification.type === 'error' ? 'error' : 'success'}`}>
           <span>{notification.message}</span>
+        </div>
+      )}
+
+      {/* Delete Account Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-base-100 rounded-lg shadow-2xl p-6 max-w-sm w-full space-y-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <AlertCircle className="w-6 h-6 text-error" />
+              Delete Account?
+            </h2>
+            <p className="text-base-content/70">
+              This action cannot be undone. Your account and related profile data will be permanently deleted.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="btn btn-ghost flex-1"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                className="btn btn-error flex-1 gap-2"
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -408,12 +468,12 @@ export default function ProfilePage() {
                     onChange={handleChange}
                   >
                     <option value="">Select your work type...</option>
-                    <option value="plumbing">🔧 Plumbing</option>
-                    <option value="electrical">⚡ Electrical</option>
-                    <option value="cleanliness">🧹 Cleanliness</option>
-                    <option value="network">📡 Network</option>
-                    <option value="furniture">🪑 Furniture</option>
-                    <option value="other">📋 Other</option>
+                    <option value="plumbing">ðŸ”§ Plumbing</option>
+                    <option value="electrical">âš¡ Electrical</option>
+                    <option value="cleanliness">ðŸ§¹ Cleanliness</option>
+                    <option value="network">ðŸ“¡ Network</option>
+                    <option value="furniture">ðŸª‘ Furniture</option>
+                    <option value="other">ðŸ“‹ Other</option>
                   </select>
                   <label className="label">
                     <span className="label-text-alt text-xs text-base-content/50">
@@ -472,7 +532,7 @@ export default function ProfilePage() {
         <div className="alert bg-warning/10 border-warning/30 text-warning-content">
           <AlertCircle className="w-5 h-5" />
           <div>
-            <h3 className="font-bold">⚠️ WORKER: Set Your Work Type</h3>
+            <h3 className="font-bold">âš ï¸ WORKER: Set Your Work Type</h3>
             <p className="text-xs mt-1">
               Your work type determines which complaints you can be assigned to. Select your specialization above.
             </p>
@@ -484,11 +544,11 @@ export default function ProfilePage() {
         <div className="alert bg-warning/10 border-warning/30 text-warning-content">
           <AlertCircle className="w-5 h-5" />
           <div>
-            <h3 className="font-bold">⚠️ WARDEN: No Hostel Assigned</h3>
+            <h3 className="font-bold">âš ï¸ WARDEN: No Hostel Assigned</h3>
             <p className="text-xs mt-1">
               {user?.status === "pending"
-                ? "🔄 PENDING: Once the ADMIN approves you → The ADMIN will assign you to manage a hostel."
-                : "📞 ACTIVE: Contact the ADMIN to get assigned to manage a specific hostel."}
+                ? "ðŸ”„ PENDING: Once the ADMIN approves you â†’ The ADMIN will assign you to manage a hostel."
+                : "ðŸ“ž ACTIVE: Contact the ADMIN to get assigned to manage a specific hostel."}
             </p>
             <p className="text-xs text-base-content/50 mt-2">[role={user?.role}, status={user?.status}]</p>
           </div>
@@ -517,6 +577,42 @@ export default function ProfilePage() {
           </p>
         </div>
       </div>
+
+      {/* Danger Zone */}
+      <div className="card bg-error/5 border border-error/30">
+        <div className="card-body">
+          <h3 className="card-title text-error">Danger Zone</h3>
+          <p className="text-sm text-base-content/70">
+            Deleting your account is permanent. You will lose access immediately.
+          </p>
+          <div>
+            <button
+              type="button"
+              className="btn btn-error gap-2"
+              onClick={() => setDeleteModalOpen(true)}
+              disabled={deleting || user?.role === "admin"}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Deleting Account...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Delete Account
+                </>
+              )}
+            </button>
+            {user?.role === "admin" && (
+              <p className="text-xs text-base-content/60 mt-2">
+                Admin accounts cannot be deleted from self-service profile.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
+

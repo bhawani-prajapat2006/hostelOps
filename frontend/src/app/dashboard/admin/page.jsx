@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -193,7 +193,7 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -562,3 +562,4 @@ export default function AdminDashboard() {
     </div>
   )
 }
+

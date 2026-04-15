@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Text, DateTime
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -105,6 +105,8 @@ class Complaint(Base):
     assigned_to = Column(Integer, ForeignKey("users.id"), nullable=True)
     status = Column(Enum(ComplaintStatusEnum), default=ComplaintStatusEnum.open, nullable=False)
     image_url = Column(String(512), nullable=True)
+    image_after_solved = Column(String(512), nullable=True)
+    awaiting_warden_review = Column(Boolean, default=False, nullable=False)
 
     # Hostel this complaint is from
     hostel_id = Column(Integer, ForeignKey("hostels.id"), nullable=False)

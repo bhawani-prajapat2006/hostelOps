@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -16,6 +16,8 @@ import {
 } from "lucide-react"
 
 import api from "@/lib/api"
+import CloudinaryUpload from "@/components/CloudinaryUpload"
+import { submitResolutionProof } from "@/services/complaintService"
 
 export default function WorkerDashboard() {
   const router = useRouter()
@@ -28,8 +30,20 @@ export default function WorkerDashboard() {
   ])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [proofModalOpen, setProofModalOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [proofImageUrl, setProofImageUrl] = useState("")
+  const [toasts, setToasts] = useState([])
   const [filter, setFilter] = useState("all")
   const [sortBy, setSortBy] = useState("created_at")
+
+  const addToast = (message, type = "success") => {
+    const id = Date.now()
+    setToasts((prev) => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id))
+    }, 3000)
+  }
 
   useEffect(() => {
     fetchDashboardData()
@@ -87,7 +101,36 @@ export default function WorkerDashboard() {
       await fetchDashboardData()
     } catch (err) {
       console.error("Failed to update status", err)
-      alert("Failed to update status. Please try again.")
+      addToast("Failed to update status. Please try again.", "error")
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const openProofModal = (task) => {
+    setSelectedTask(task)
+    setProofImageUrl("")
+    setProofModalOpen(true)
+  }
+
+  const handleSubmitProof = async () => {
+    if (!selectedTask) return
+    if (!proofImageUrl) {
+      addToast("Please upload the after-fix image before submitting.", "error")
+      return
+    }
+
+    try {
+      setUpdating(true)
+      await submitResolutionProof(selectedTask.id, proofImageUrl, localStorage.getItem("access_token"))
+      setProofModalOpen(false)
+      setSelectedTask(null)
+      setProofImageUrl("")
+      await fetchDashboardData()
+      addToast("Proof submitted. Complaint moved to warden review queue.", "success")
+    } catch (err) {
+      console.error("Failed to submit proof", err)
+      addToast(err?.response?.data?.detail || "Failed to submit proof. Please try again.", "error")
     } finally {
       setUpdating(false)
     }
@@ -132,7 +175,7 @@ export default function WorkerDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -147,6 +190,18 @@ export default function WorkerDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-base-100 to-base-200 p-6 lg:p-10 space-y-8 max-w-7xl mx-auto">
+
+      {/* Toast Container */}
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`alert shadow-lg ${toast.type === "error" ? "alert-error" : "alert-success"}`}
+          >
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -179,6 +234,47 @@ export default function WorkerDashboard() {
           Refresh
         </button>
       </div>
+
+      {proofModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-base-100 rounded-lg shadow-2xl p-6 max-w-lg w-full space-y-4">
+            <h2 className="text-xl font-bold">Submit Completion Proof</h2>
+            <p className="text-sm text-base-content/70">
+              Upload an image of the resolved issue. Warden will review and then close or send back the complaint.
+            </p>
+
+            <CloudinaryUpload
+              onUpload={(url) => setProofImageUrl(url)}
+              onError={(msg) => console.error("Proof upload error:", msg)}
+            />
+
+            {proofImageUrl && (
+              <p className="text-xs text-success break-all">Uploaded: {proofImageUrl}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                className="btn btn-ghost flex-1"
+                onClick={() => {
+                  setProofModalOpen(false)
+                  setSelectedTask(null)
+                  setProofImageUrl("")
+                }}
+                disabled={updating}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary flex-1"
+                onClick={handleSubmitProof}
+                disabled={updating || !proofImageUrl}
+              >
+                Submit for Review
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-3">
@@ -293,11 +389,11 @@ export default function WorkerDashboard() {
                         )}
                         {task.status === "in_progress" && (
                           <button
-                            onClick={() => handleStatusUpdate(task.id, "closed")}
+                            onClick={() => openProofModal(task)}
                             disabled={updating}
                             className="btn btn-sm btn-success btn-outline flex-1"
                           >
-                            Mark Completed
+                            Submit Proof
                           </button>
                         )}
                         <Link
@@ -323,7 +419,7 @@ export default function WorkerDashboard() {
             <div className="card bg-gradient-to-br from-primary/10 to-primary/5 shadow-lg border border-primary/20">
               <div className="card-body">
                 <h3 className="card-title text-lg flex items-center gap-2">
-                  📍 Assigned Hostel
+                  ðŸ“ Assigned Hostel
                 </h3>
                 <p className="text-2xl font-bold text-primary mt-2">{user.hostel_name}</p>
                 {user?.specialization && (
@@ -403,3 +499,4 @@ export default function WorkerDashboard() {
     </div>
   )
 }
+

@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from http import HTTPStatus
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from jose import JWTError
 
 from google.oauth2 import id_token as google_id_token
@@ -21,6 +23,15 @@ from app.core.config import settings
 from app.core.auth import get_current_user
 
 router = APIRouter()
+
+
+def _build_token_response(user: models.User) -> dict:
+    token_data = {"sub": str(user.id), "role": user.role.value, "status": user.status.value}
+    return {
+        "access_token": create_access_token(token_data),
+        "refresh_token": create_refresh_token(token_data),
+        "token_type": "bearer",
+    }
 
 
 # ───── Profile ─────
@@ -47,13 +58,59 @@ def update_profile(
     return user
 
 
+@router.delete("/me", response_model=Message)
+def delete_my_account(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete the currently logged-in user account and related references safely."""
+    user = db.get(models.User, current_user["id"])
+    if not user:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="User not found")
+
+    if user.role == models.UserRoleEnum.admin:
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Admin account deletion is not allowed")
+
+    # Remove references that would block deleting this user due to foreign keys.
+    db.query(models.Complaint).filter(models.Complaint.assigned_to == user.id).update(
+        {models.Complaint.assigned_to: None},
+        synchronize_session=False,
+    )
+    db.query(models.Hostel).filter(models.Hostel.warden_id == user.id).update(
+        {models.Hostel.warden_id: None},
+        synchronize_session=False,
+    )
+    db.query(models.ComplaintHistory).filter(models.ComplaintHistory.changed_by == user.id).delete(
+        synchronize_session=False
+    )
+
+    db.delete(user)
+    db.commit()
+    return {"message": "Account deleted successfully"}
+
+
 # ───── Registration ─────
 
 @router.post("/register", response_model=TokenResponse, status_code=HTTPStatus.CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    existing = db.query(models.User).filter(models.User.email == payload.email).first()
+    normalized_email = payload.email.strip().lower()
+    existing = db.query(models.User).filter(func.lower(models.User.email) == normalized_email).first()
     if existing:
-        raise HTTPException(status_code=HTTPStatus.CONFLICT, detail="Email already registered")
+        if existing.auth_provider == "google":
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT,
+                detail="This email is registered with Google. Please continue with Google Sign-In.",
+            )
+
+        # Professional UX: if the local account already exists and password matches,
+        # treat this as a returning sign-in instead of hard-failing registration.
+        if existing.password and verify_password(payload.password, existing.password):
+            return JSONResponse(status_code=HTTPStatus.OK, content=_build_token_response(existing))
+
+        raise HTTPException(
+            status_code=HTTPStatus.CONFLICT,
+            detail="Email already registered. Please login with your existing password.",
+        )
 
     # Determine initial status based on role
     # Students are immediately active, workers/wardens need approval
@@ -62,7 +119,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
     user = models.User(
         username=payload.username,
-        email=payload.email,
+        email=normalized_email,
         password=hash_password(payload.password),
         role=role,
         status=status,
@@ -72,31 +129,37 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    token_data = {"sub": str(user.id), "role": user.role.value, "status": user.status.value}
-    return {
-        "access_token": create_access_token(token_data),
-        "refresh_token": create_refresh_token(token_data),
-        "token_type": "bearer",
-    }
+    return _build_token_response(user)
 
 
 # ───── Login ─────
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == payload.email).first()
-    if not user or not user.password:
-        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Invalid email or password")
+    normalized_email = payload.email.strip().lower()
+    user = db.query(models.User).filter(func.lower(models.User.email) == normalized_email).first()
+    if not user:
+        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="No account found for this email.")
+
+    if user.auth_provider == "google" and not user.password:
+        raise HTTPException(
+            status_code=HTTPStatus.UNAUTHORIZED,
+            detail="This account uses Google Sign-In. Please continue with Google.",
+        )
+
+    if not user.password:
+        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Invalid account state. Please contact admin.")
 
     if not verify_password(payload.password, user.password):
-        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Invalid email or password")
+        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Incorrect password. Please try again.")
 
-    token_data = {"sub": str(user.id), "role": user.role.value, "status": user.status.value}
-    return {
-        "access_token": create_access_token(token_data),
-        "refresh_token": create_refresh_token(token_data),
-        "token_type": "bearer",
-    }
+    if user.status == models.UserStatusEnum.inactive:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail="Your account is inactive. Please contact admin support.",
+        )
+
+    return _build_token_response(user)
 
 
 # ───── Token Refresh ─────
@@ -159,22 +222,28 @@ def logout(
 @router.post("/google", response_model=TokenResponse)
 def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     """Verify a Google ID token, create user if new, return JWT."""
+    is_new_google_user = False
     try:
         idinfo = google_id_token.verify_oauth2_token(
             payload.id_token,
             google_requests.Request(),
             settings.GOOGLE_CLIENT_ID,
+            # Tolerate minor client/server clock drift.
+            clock_skew_in_seconds=120,
         )
-    except ValueError:
-        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Invalid Google token")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=HTTPStatus.UNAUTHORIZED,
+            detail=f"Google sign-in verification failed. {str(e)}",
+        )
 
-    email = idinfo.get("email")
+    email = (idinfo.get("email") or "").strip().lower()
     name = idinfo.get("name", email.split("@")[0])
 
     if not email:
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Google account has no email")
 
-    user = db.query(models.User).filter(models.User.email == email).first()
+    user = db.query(models.User).filter(func.lower(models.User.email) == email).first()
     if user:
         # Prevent Google login from hijacking a local account
         if user.auth_provider == "local":
@@ -194,12 +263,14 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
         db.add(user)
         db.commit()
         db.refresh(user)
+        is_new_google_user = True
 
     token_data = {"sub": str(user.id), "role": user.role.value, "status": user.status.value}
     return {
         "access_token": create_access_token(token_data),
         "refresh_token": create_refresh_token(token_data),
         "token_type": "bearer",
+        "needs_role_selection": is_new_google_user,
     }
 
 

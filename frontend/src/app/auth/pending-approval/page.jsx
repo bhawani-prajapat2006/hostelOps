@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -71,7 +71,7 @@ export default function PendingApprovalPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -88,7 +88,7 @@ export default function PendingApprovalPage() {
     worker: {
       title: "Worker Account Pending",
       description: "Your worker account is awaiting admin approval.",
-      icon: "🔧",
+      icon: "ðŸ”§",
       what_next: "An admin will review your application and grant you access to the worker dashboard where you can:",
       features: [
         "View assigned maintenance tasks",
@@ -99,7 +99,7 @@ export default function PendingApprovalPage() {
     warden: {
       title: "Warden Account Pending",
       description: "Your warden account is awaiting admin approval.",
-      icon: "🏠",
+      icon: "ðŸ ",
       what_next: "An admin will review your application and grant you access to the warden dashboard where you can:",
       features: [
         "Manage all complaints in your hostel",
@@ -154,7 +154,7 @@ export default function PendingApprovalPage() {
             <ul className="space-y-2">
               {info.features.map((feature, idx) => (
                 <li key={idx} className="flex gap-3 text-sm">
-                  <span className="text-primary flex-shrink-0">✓</span>
+                  <span className="text-primary flex-shrink-0">âœ“</span>
                   <span>{feature}</span>
                 </li>
               ))}
@@ -194,3 +194,4 @@ export default function PendingApprovalPage() {
     </div>
   )
 }
+

@@ -31,6 +31,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str | None = None
     token_type: str = "bearer"
+    needs_role_selection: bool = False
 
 
 class RefreshRequest(BaseModel):

@@ -2,33 +2,70 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import axios from "axios"
 import api from "@/lib/api"
 import ComplaintCard from "@/components/ComplaintCard"
+import WardenDashboardSkeleton from "@/components/ui/WardenDashboardSkeleton"
 import {
   assignWorker,
   getAllComplaints,
+  reviewResolution,
   updateStatus,
 } from "@/services/complaintService"
 
 const statusFilterOptions = [
   { label: "All", value: "all" },
+  { label: "Needs Review", value: "awaiting_review" },
   { label: "Posted", value: "open" },
   { label: "Solving", value: "in_progress" },
   { label: "Solved", value: "closed" },
 ]
 
+const BASE_URL = "http://localhost:8000/api/v1"
+
 export default function WardenDashboardPage() {
   const router = useRouter()
   const [token, setToken] = useState("")
   const [complaints, setComplaints] = useState([])
+  const [workers, setWorkers] = useState([])
   const [user, setUser] = useState(null)
   const [statusFilter, setStatusFilter] = useState("all")
   const [loading, setLoading] = useState(true)
   const [assigning, setAssigning] = useState(false)
   const [updating, setUpdating] = useState(false)
 
+  const deriveWorkersFromComplaints = (items) => {
+    if (!Array.isArray(items)) return []
+    const map = new Map()
+
+    for (const item of items) {
+      const workerObj = item?.assigned_worker
+      if (workerObj?.id) {
+        map.set(workerObj.id, {
+          id: workerObj.id,
+          username: workerObj.username || `Worker #${workerObj.id}`,
+          email: workerObj.email || "",
+        })
+        continue
+      }
+
+      if (item?.assigned_to) {
+        map.set(item.assigned_to, {
+          id: item.assigned_to,
+          username: `Worker #${item.assigned_to}`,
+          email: "",
+        })
+      }
+    }
+
+    return Array.from(map.values())
+  }
+
   const filteredComplaints = useMemo(() => {
     if (statusFilter === "all") return complaints
+    if (statusFilter === "awaiting_review") {
+      return complaints.filter((item) => item.awaiting_warden_review)
+    }
     return complaints.filter((item) => item.status === statusFilter)
   }, [complaints, statusFilter])
 
@@ -66,6 +103,22 @@ export default function WardenDashboardPage() {
           ? complaintRes.complaints
           : []
       setComplaints(normalizedComplaints)
+
+      const fallbackWorkers = deriveWorkersFromComplaints(normalizedComplaints)
+      setWorkers(fallbackWorkers)
+
+      const usersRes = await axios.get(`${BASE_URL}/users/`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      })
+      const allUsers = Array.isArray(usersRes.data?.users) ? usersRes.data.users : []
+      const normalizedWorkers = allUsers.filter((entry) => {
+        const role = typeof entry.role === "string" ? entry.role : entry?.role?.value
+        return role === "worker"
+      })
+
+      setWorkers(normalizedWorkers.length > 0 ? normalizedWorkers : fallbackWorkers)
     } catch (error) {
       console.error("Failed to load warden dashboard data:", error)
     } finally {
@@ -94,6 +147,19 @@ export default function WardenDashboardPage() {
       await fetchDashboardData(token)
     } catch (error) {
       console.error("Failed to update complaint status:", error)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleReviewResolution = async (complaintId, approve) => {
+    if (!token) return
+    setUpdating(true)
+    try {
+      await reviewResolution(complaintId, approve, token)
+      await fetchDashboardData(token)
+    } catch (error) {
+      console.error("Failed to review resolution:", error)
     } finally {
       setUpdating(false)
     }
@@ -138,9 +204,7 @@ export default function WardenDashboardPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
+        <WardenDashboardSkeleton />
       ) : filteredComplaints.length === 0 ? (
         <div className="card bg-base-100 border border-dashed border-base-300">
           <div className="card-body items-center text-center py-12">
@@ -154,11 +218,12 @@ export default function WardenDashboardPage() {
             <ComplaintCard
               key={complaint.id}
               complaint={complaint}
+              workers={workers}
               onAssignWorker={handleAssignWorker}
               onUpdateStatus={handleUpdateStatus}
+              onReviewResolution={handleReviewResolution}
               assigning={assigning}
               updating={updating}
-              token={token}
             />
           ))}
         </div>

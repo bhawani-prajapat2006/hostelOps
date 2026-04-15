@@ -26,6 +26,15 @@ class ComplaintCreate(BaseModel):
     image_url: Optional[str] = None
 
 
+class AssignedWorkerPublic(BaseModel):
+    id: int
+    username: str
+    email: str
+    work_type: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class ComplaintPublic(BaseModel):
     id: int
     title: str
@@ -35,6 +44,9 @@ class ComplaintPublic(BaseModel):
     assigned_to: Optional[int] = None
     status: ComplaintStatus = ComplaintStatus.open
     image_url: Optional[str] = None
+    image_after_solved: Optional[str] = None
+    awaiting_warden_review: bool = False
+    assigned_worker: Optional[AssignedWorkerPublic] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -49,6 +61,16 @@ class ComplaintUpdate(BaseModel):
 
 class ComplaintAssign(BaseModel):
     worker_id: int
+
+
+class ComplaintResolutionSubmit(BaseModel):
+    image_after_solved: str = Field(..., min_length=5, max_length=512)
+
+
+class ComplaintReviewRequest(BaseModel):
+    approve: bool
+    comment: Optional[str] = Field(None, max_length=500)
+    reassign_worker_id: Optional[int] = None
 
 
 class ComplaintHistoryPublic(BaseModel):

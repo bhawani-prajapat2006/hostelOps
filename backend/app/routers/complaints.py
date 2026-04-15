@@ -7,6 +7,7 @@ from sqlalchemy import or_
 from app.schemas.complaint import (
     ComplaintCreate, ComplaintPublic, ComplaintUpdate, ComplaintAssign,
     ComplaintHistoryPublic, PaginatedComplaints, ComplaintStatus, ComplaintCategory,
+    ComplaintResolutionSubmit, ComplaintReviewRequest,
 )
 from app.schemas.user import Message
 from app.core.auth import get_current_user, require_role, require_role_and_active, require_active_status
@@ -116,6 +117,7 @@ def list_complaints(
     status: Optional[ComplaintStatus] = None,
     category: Optional[ComplaintCategory] = None,
     assigned_to: Optional[int] = None,
+    awaiting_review: Optional[bool] = None,
     sort_by: str = Query("created_at", pattern="^(created_at|status|category)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     search: Optional[str] = Query(None, min_length=1, max_length=200, description="Search in title/description"),
@@ -156,6 +158,8 @@ def list_complaints(
         query = query.filter(models.Complaint.category == models.ComplaintCategoryEnum(category.value))
     if assigned_to is not None:
         query = query.filter(models.Complaint.assigned_to == assigned_to)
+    if awaiting_review is not None:
+        query = query.filter(models.Complaint.awaiting_warden_review == awaiting_review)
 
     # Sorting
     sort_col = getattr(models.Complaint, sort_by, models.Complaint.created_at)
@@ -228,6 +232,20 @@ def update_complaint(complaint_id: int, complaint: ComplaintUpdate, current_user
     if complaint.status is not None:
         existing.status = models.ComplaintStatusEnum(complaint.status.value if hasattr(complaint.status, "value") else complaint.status)
 
+    # If a warden/admin sends the complaint back from review queue,
+    # clear the worker's proof image so a fresh proof is required.
+    if (
+        complaint.status is not None
+        and existing.awaiting_warden_review
+        and existing.status == models.ComplaintStatusEnum.in_progress
+    ):
+        existing.awaiting_warden_review = False
+        existing.image_after_solved = None
+
+    # Once closed, it is no longer pending review.
+    if complaint.status is not None and existing.status == models.ComplaintStatusEnum.closed:
+        existing.awaiting_warden_review = False
+
     # Record in history if status changed
     if complaint.status is not None and old_status != existing.status.value:
         db.add(models.ComplaintHistory(
@@ -240,6 +258,97 @@ def update_complaint(complaint_id: int, complaint: ComplaintUpdate, current_user
     db.commit()
     db.refresh(existing)
     return existing
+
+
+@router.put("/{complaint_id}/submit-resolution", response_model=ComplaintPublic)
+def submit_resolution(
+    complaint_id: int,
+    payload: ComplaintResolutionSubmit,
+    current_user: dict = Depends(require_role_and_active("worker")),
+    db: Session = Depends(get_db),
+):
+    """Worker submits after-fix proof image for warden review."""
+    from sqlalchemy.orm import selectinload
+    complaint = db.query(models.Complaint).options(
+        selectinload(models.Complaint.assigned_worker)
+    ).filter(models.Complaint.id == complaint_id).first()
+
+    if not complaint:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
+
+    if complaint.assigned_to != current_user["id"]:
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Only the assigned worker can submit resolution proof")
+
+    if complaint.status != models.ComplaintStatusEnum.in_progress:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Resolution proof can only be submitted for in-progress complaints")
+
+    complaint.image_after_solved = payload.image_after_solved
+    complaint.awaiting_warden_review = True
+
+    db.add(models.ComplaintHistory(
+        complaint_id=complaint.id,
+        changed_by=current_user["id"],
+        old_status=complaint.status.value,
+        new_status=complaint.status.value,
+        comment="Worker submitted completion proof for warden review",
+    ))
+
+    db.commit()
+    db.refresh(complaint)
+    return complaint
+
+
+@router.put("/{complaint_id}/review-resolution", response_model=ComplaintPublic)
+def review_resolution(
+    complaint_id: int,
+    payload: ComplaintReviewRequest,
+    current_user: dict = Depends(require_role_and_active("warden", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Warden/Admin approves or rejects worker-submitted resolution proof."""
+    from sqlalchemy.orm import selectinload
+    complaint = db.query(models.Complaint).options(
+        selectinload(models.Complaint.assigned_worker)
+    ).filter(models.Complaint.id == complaint_id).first()
+
+    if not complaint:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Complaint not found")
+
+    if not complaint.awaiting_warden_review:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Complaint is not in review queue")
+
+    old_status = complaint.status.value
+
+    if payload.approve:
+        complaint.status = models.ComplaintStatusEnum.closed
+        complaint.awaiting_warden_review = False
+        comment = payload.comment or "Warden approved worker resolution proof and closed complaint"
+    else:
+        complaint.status = models.ComplaintStatusEnum.in_progress
+        complaint.awaiting_warden_review = False
+        complaint.image_after_solved = None
+        comment = payload.comment or "Warden rejected worker resolution proof and sent complaint back"
+
+        if payload.reassign_worker_id is not None:
+            worker = db.get(models.User, payload.reassign_worker_id)
+            if not worker:
+                raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Worker not found")
+            if worker.role != models.UserRoleEnum.worker:
+                raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="User is not a worker")
+            complaint.assigned_to = worker.id
+            comment = f"{comment}. Reassigned to worker #{worker.id}"
+
+    db.add(models.ComplaintHistory(
+        complaint_id=complaint.id,
+        changed_by=current_user["id"],
+        old_status=old_status,
+        new_status=complaint.status.value,
+        comment=comment,
+    ))
+
+    db.commit()
+    db.refresh(complaint)
+    return complaint
 
 
 # ───── Assign worker ─────

@@ -1,8 +1,8 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Zap, CheckCircle2, AlertCircle } from "lucide-react"
+import { Zap, CheckCircle2, AlertCircle, BookOpen, Wrench, Building2 } from "lucide-react"
 import api from "@/lib/api"
 
 export default function SelectRolePage() {
@@ -76,7 +76,7 @@ export default function SelectRolePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -94,7 +94,7 @@ export default function SelectRolePage() {
       value: "student",
       title: "Student",
       description: "Post and track your hostel complaints",
-      icon: "📚",
+      Icon: BookOpen,
       benefits: [
         "Post complaints immediately",
         "Track complaint status",
@@ -106,7 +106,7 @@ export default function SelectRolePage() {
       value: "worker",
       title: "Maintenance Worker",
       description: "Handle and resolve hostel maintenance tasks",
-      icon: "🔧",
+      Icon: Wrench,
       benefits: [
         "View assigned tasks",
         "Update task resolution status",
@@ -118,7 +118,7 @@ export default function SelectRolePage() {
       value: "warden",
       title: "Hostel Warden",
       description: "Manage complaints and assign workers",
-      icon: "🏠",
+      Icon: Building2,
       benefits: [
         "Manage all hostel complaints",
         "Assign workers to tasks",
@@ -165,7 +165,9 @@ export default function SelectRolePage() {
           >
             <div className="card-body">
               {/* Icon & Title */}
-              <div className="text-5xl mb-3 text-center">{option.icon}</div>
+              <div className="mb-3 flex justify-center">
+                <option.Icon className="w-10 h-10 text-primary" />
+              </div>
               <h3 className="card-title text-lg justify-center">{option.title}</h3>
               <p className="text-sm text-base-content/60 text-center">{option.description}</p>
 
@@ -191,7 +193,7 @@ export default function SelectRolePage() {
               {selectedRole === option.value && (
                 <div className="mt-3 pt-3 border-t border-base-300">
                   <div className="badge badge-primary w-full justify-center">
-                    ✓ Selected
+                    Selected
                   </div>
                 </div>
               )}
@@ -216,7 +218,7 @@ export default function SelectRolePage() {
         >
           {submitting ? (
             <>
-              <span className="loading loading-spinner loading-sm"></span>
+              <span className="loading loading-bars loading-sm"></span>
               Confirming...
             </>
           ) : (
@@ -230,3 +232,4 @@ export default function SelectRolePage() {
     </div>
   )
 }
+

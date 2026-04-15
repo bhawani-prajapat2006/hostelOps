@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -205,7 +205,7 @@ export default function AdminHostelsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -283,11 +283,11 @@ export default function AdminHostelsPage() {
                   {hostels.map(hostel => (
                     <tr key={hostel.id}>
                       <td className="font-bold">{hostel.name}</td>
-                      <td className="text-sm">{hostel.address || "—"}</td>
+                      <td className="text-sm">{hostel.address || "â€”"}</td>
                       <td>
-                        <div className="badge badge-ghost">{hostel.total_rooms || "—"}</div>
+                        <div className="badge badge-ghost">{hostel.total_rooms || "â€”"}</div>
                       </td>
-                      <td>{hostel.capacity || "—"}</td>
+                      <td>{hostel.capacity || "â€”"}</td>
                       <td>
                         {hostel.warden_id ? (
                           <div className="badge badge-success">Assigned</div>
@@ -305,13 +305,6 @@ export default function AdminHostelsPage() {
                           title="Assign Warden"
                         >
                           <User className="w-4 h-4" />
-                        </button>
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          onClick={() => handleOpenHostelUsers(hostel)}
-                          title="View Users"
-                        >
-                          <Users className="w-4 h-4" />
                         </button>
                         <button
                           className="btn btn-sm btn-ghost"
@@ -555,7 +548,7 @@ export default function AdminHostelsPage() {
               )}
 
               <div className="alert alert-info">
-                <span>ℹ️ Workers are independent and assigned to specific complaints by wardens/admins, not to hostels.</span>
+                <span>â„¹ï¸ Workers are independent and assigned to specific complaints by wardens/admins, not to hostels.</span>
               </div>
 
               <div className="modal-action">
@@ -577,3 +570,4 @@ export default function AdminHostelsPage() {
     </div>
   )
 }
+

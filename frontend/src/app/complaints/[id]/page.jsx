@@ -109,7 +109,7 @@ export default function ComplaintDetailPage() {
     }
   }
 
-  const canUpdateStatus = user && ["worker", "warden", "admin"].includes(user.role)
+  const canUpdateStatus = user && ["warden", "admin"].includes(user.role)
   const canDelete = user && (user.id === complaint?.created_by || ["warden", "admin"].includes(user.role))
 
   const handleDelete = async () => {
@@ -150,7 +150,7 @@ export default function ComplaintDetailPage() {
   if (loading) {
     return (
       <div className="min bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <span className="loading loading-bars loading-lg text-primary"></span>
       </div>
     )
   }
@@ -308,6 +308,17 @@ export default function ComplaintDetailPage() {
                   />
                 </div>
               )}
+
+              {complaint.image_after_solved && (
+                <div>
+                  <h3 className="font-bold mb-2">After Fix (Worker Proof)</h3>
+                  <img
+                    src={complaint.image_after_solved}
+                    alt="Resolved proof"
+                    className="w-full max-h-96 object-cover rounded-lg border border-success/30"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -396,6 +407,10 @@ export default function ComplaintDetailPage() {
                       )}
                     </div>
                   </div>
+                ) : complaint.assigned_to ? (
+                  <p className="text-sm font-semibold bg-base-100 p-3 rounded-lg">
+                    Worker #{complaint.assigned_to}
+                  </p>
                 ) : (
                   <p className="text-sm font-semibold bg-base-100 p-3 rounded-lg text-base-content/50">
                     Unassigned

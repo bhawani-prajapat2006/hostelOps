@@ -30,3 +30,27 @@ export const updateStatus = async (id, status, token) => {
   )
   return response.data
 }
+
+export const submitResolutionProof = async (id, imageAfterSolved, token) => {
+  const response = await axios.put(
+    `${BASE_URL}/complaints/${id}/submit-resolution`,
+    { image_after_solved: imageAfterSolved },
+    authHeaders(token)
+  )
+  return response.data
+}
+
+export const reviewResolution = async (id, approve, token, options = {}) => {
+  const payload = {
+    approve,
+    ...(options.comment ? { comment: options.comment } : {}),
+    ...(options.reassignWorkerId ? { reassign_worker_id: Number(options.reassignWorkerId) } : {}),
+  }
+
+  const response = await axios.put(
+    `${BASE_URL}/complaints/${id}/review-resolution`,
+    payload,
+    authHeaders(token)
+  )
+  return response.data
+}
