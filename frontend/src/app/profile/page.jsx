@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import api from "@/lib/api"
+import { clearAuthTokens } from "@/lib/tokenStore"
 import {
   User,
   Mail,
@@ -166,8 +167,7 @@ export default function ProfilePage() {
     setDeleting(true)
     try {
       await api.delete("/api/v1/auth/me")
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("refresh_token")
+      clearAuthTokens()
       router.replace("/login")
     } catch (err) {
       showNotification(err.response?.data?.detail || "Failed to delete account", "error")

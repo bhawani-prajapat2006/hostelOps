@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import api from "@/lib/api"
+import { getAccessToken, setAuthTokens } from "@/lib/tokenStore"
 import { GoogleLogin } from "@react-oauth/google"
 import { Mail, Lock, User, AlertCircle, CheckCircle, Home } from "lucide-react"
 
@@ -59,7 +60,7 @@ export default function AuthPage() {
 
   // Redirect to dashboard if already logged in
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
     routeByRole(token, router)
   }, [])
@@ -96,10 +97,7 @@ export default function AuthPage() {
       }
 
       const { access_token, refresh_token } = res.data
-      localStorage.setItem("access_token", access_token)
-      if (refresh_token) {
-        localStorage.setItem("refresh_token", refresh_token)
-      }
+      setAuthTokens(access_token, refresh_token)
 
       setSuccess(mode === "login" ? "Welcome back!" : "Account ready. Signing you in...")
       setTimeout(() => {
@@ -124,10 +122,7 @@ export default function AuthPage() {
       )
       const { access_token, refresh_token } = res.data
       const needsRoleSelection = Boolean(res.data?.needs_role_selection)
-      localStorage.setItem("access_token", access_token)
-      if (refresh_token) {
-        localStorage.setItem("refresh_token", refresh_token)
-      }
+      setAuthTokens(access_token, refresh_token)
       setSuccess("Login successful!")
       setTimeout(() => {
         if (needsRoleSelection) {

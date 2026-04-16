@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Clock, AlertCircle, LogOut, RefreshCw } from "lucide-react"
 import api from "@/lib/api"
+import { getAccessToken, clearAuthTokens } from "@/lib/tokenStore"
 
 export default function PendingApprovalPage() {
   const router = useRouter()
@@ -18,7 +19,7 @@ export default function PendingApprovalPage() {
   const fetchUserData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         router.push("/login")
         return
@@ -63,8 +64,7 @@ export default function PendingApprovalPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
+    clearAuthTokens()
     router.push("/login")
   }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import axios from "axios"
 import api from "@/lib/api"
+import { getAccessToken } from "@/lib/tokenStore"
 import ComplaintCard from "@/components/ComplaintCard"
 import WardenDashboardSkeleton from "@/components/ui/WardenDashboardSkeleton"
 import {
@@ -70,7 +71,7 @@ export default function WardenDashboardPage() {
   }, [complaints, statusFilter])
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("access_token") || ""
+    const storedToken = getAccessToken() || ""
     setToken(storedToken)
   }, [])
 

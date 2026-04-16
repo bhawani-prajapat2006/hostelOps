@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import api from "@/lib/api"
+import { getAccessToken, clearAuthTokens } from "@/lib/tokenStore"
 import {
   Menu,
   X,
@@ -31,7 +32,7 @@ export default function Navbar() {
   const fetchUser = async () => {
     try {
       // Check if token exists before fetching
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         setLoading(false)
         return
@@ -42,8 +43,7 @@ export default function Navbar() {
     } catch (err) {
       // If 401, clear tokens and redirect to login
       if (err.response?.status === 401) {
-        localStorage.removeItem("access_token")
-        localStorage.removeItem("refresh_token")
+        clearAuthTokens()
         router.push("/login")
       }
       console.error("Failed to fetch user:", err)
@@ -76,8 +76,7 @@ export default function Navbar() {
       addToast("Logout failed!", "error")
     } finally {
       // Clear tokens regardless of API response
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("refresh_token")
+      clearAuthTokens()
       setTimeout(() => router.push("/login"), 1500)
     }
   }

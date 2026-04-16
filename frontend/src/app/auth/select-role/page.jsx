@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Zap, CheckCircle2, AlertCircle, BookOpen, Wrench, Building2 } from "lucide-react"
 import api from "@/lib/api"
+import { getAccessToken } from "@/lib/tokenStore"
 
 export default function SelectRolePage() {
   const router = useRouter()
@@ -20,7 +21,7 @@ export default function SelectRolePage() {
   const fetchUserData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         router.push("/login")
         return

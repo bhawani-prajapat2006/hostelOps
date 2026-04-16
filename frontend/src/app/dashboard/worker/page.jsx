@@ -18,6 +18,7 @@ import {
 import api from "@/lib/api"
 import CloudinaryUpload from "@/components/CloudinaryUpload"
 import { submitResolutionProof } from "@/services/complaintService"
+import { getAccessToken } from "@/lib/tokenStore"
 
 export default function WorkerDashboard() {
   const router = useRouter()
@@ -122,7 +123,7 @@ export default function WorkerDashboard() {
 
     try {
       setUpdating(true)
-      await submitResolutionProof(selectedTask.id, proofImageUrl, localStorage.getItem("access_token"))
+      await submitResolutionProof(selectedTask.id, proofImageUrl, getAccessToken())
       setProofModalOpen(false)
       setSelectedTask(null)
       setProofImageUrl("")
