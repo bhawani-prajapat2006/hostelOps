@@ -21,7 +21,10 @@ app = FastAPI(title="HostelOps API", version="1.0.0")
 # ───── CORS ─────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=[
+    "http://localhost:3000",
+    settings.FRONTEND_URL
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
