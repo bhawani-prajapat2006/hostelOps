@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./hims.db"
 
+    # Frontend origin for CORS
+    FRONTEND_URL: str
+
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
 

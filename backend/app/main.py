@@ -11,6 +11,7 @@ from app.schemas.user import Message, PaginatedUsers
 from app.routers import complaints_router, auth_router, hostels_router
 from app.db.database import engine, get_db, Base, _get_session_local
 from app import models
+from app.core.config import settings
 from app.core.auth import get_current_user, require_role, require_role_and_active, require_active_status
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ app = FastAPI(title="HostelOps API", version="1.0.0")
 # ───── CORS ─────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten in production
+    allow_origins=[settings.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

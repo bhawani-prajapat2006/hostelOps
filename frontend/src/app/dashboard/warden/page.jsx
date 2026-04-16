@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import axios from "axios"
 import api from "@/lib/api"
 import { getAccessToken } from "@/lib/tokenStore"
 import ComplaintCard from "@/components/ComplaintCard"
@@ -21,8 +20,6 @@ const statusFilterOptions = [
   { label: "Solving", value: "in_progress" },
   { label: "Solved", value: "closed" },
 ]
-
-const BASE_URL = "http://localhost:8000/api/v1"
 
 export default function WardenDashboardPage() {
   const router = useRouter()
@@ -108,11 +105,7 @@ export default function WardenDashboardPage() {
       const fallbackWorkers = deriveWorkersFromComplaints(normalizedComplaints)
       setWorkers(fallbackWorkers)
 
-      const usersRes = await axios.get(`${BASE_URL}/users/`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      })
+      const usersRes = await api.get("/api/v1/users/")
       const allUsers = Array.isArray(usersRes.data?.users) ? usersRes.data.users : []
       const normalizedWorkers = allUsers.filter((entry) => {
         const role = typeof entry.role === "string" ? entry.role : entry?.role?.value

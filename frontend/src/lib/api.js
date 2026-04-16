@@ -6,12 +6,14 @@ import {
   clearAuthTokens,
 } from "@/lib/tokenStore"
 
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "")
+
 const api = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: API_BASE_URL,
 })
 
 const refreshClient = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: API_BASE_URL,
 })
 
 let isRefreshing = false

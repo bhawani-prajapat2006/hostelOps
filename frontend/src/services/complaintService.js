@@ -1,6 +1,7 @@
 import axios from "axios"
 
-const BASE_URL = "http://localhost:8000/api/v1"
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "")
+const BASE_URL = `${API_BASE_URL}/api/v1`
 
 const authHeaders = (token) => ({
   headers: {
